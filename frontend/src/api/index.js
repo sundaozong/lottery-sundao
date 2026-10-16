@@ -1,0 +1,81 @@
+async function request(path, options = {}) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const msg = data.detail || data.error || res.statusText
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+  }
+  return data
+}
+
+export const api = {
+  health: () => request('/api/health'),
+  meta: () => request('/api/draws/meta'),
+  latest: () => request('/api/draws/latest'),
+  draws: (type, limit = 30) =>
+    request(`/api/draws?${new URLSearchParams({ ...(type ? { lottery_type: type } : {}), limit })}`),
+  crawl: (type) =>
+    request(`/api/draws/crawl${type ? `?lottery_type=${type}` : ''}`, { method: 'POST' }),
+  analysis: (type, limit = 50) => request(`/api/analysis/${type}?limit=${limit}`),
+  predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
+  records: () => request('/api/records'),
+  createRecord: (body) => request('/api/records', { method: 'POST', body: JSON.stringify(body) }),
+  updateRecord: (id, body) => request(`/api/records/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteRecord: (id) => request(`/api/records/${id}`, { method: 'DELETE' }),
+  prizeCalc: (body) => request('/api/prize/calc', { method: 'POST', body: JSON.stringify(body) }),
+  settings: () => request('/api/settings'),
+  saveSettings: (body) => request('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  mailTest: (to) => request('/api/mail/test', { method: 'POST', body: JSON.stringify({ to }) }),
+  mailDigest: () => request('/api/mail/digest', { method: 'POST' }),
+  mailPredict: (body) => request('/api/mail/predict', { method: 'POST', body: JSON.stringify(body) }),
+}
+
+export const TYPE_NAMES = {
+  ssq: '双色球',
+  dlt: '大乐透',
+  fc3d: '福彩3D',
+  pl3: '排列三',
+  pl5: '排列五',
+  qxc: '七星彩',
+  kl8: '快乐八',
+}
+
+/** 开奖星期，JS Date.getDay()：0 周日 … 6 周六。null 表示每天。 */
+export const DRAW_WEEKDAYS = {
+  ssq: [0, 2, 4],
+  dlt: [1, 3, 6],
+  fc3d: null,
+  pl3: null,
+  pl5: null,
+  qxc: [0, 2, 5],
+  kl8: null,
+}
+
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+export function lotteriesOn(date = new Date()) {
+  const day = date.getDay()
+  const today = []
+  const off = []
+  for (const [type, name] of Object.entries(TYPE_NAMES)) {
+    const days = DRAW_WEEKDAYS[type]
+    const item = { type, name }
+    if (days == null || days.includes(day)) today.push(item)
+    else off.push(item)
+  }
+  return {
+    today,
+    off,
+    label: `${WEEKDAY_LABELS[day]} · ${date.getMonth() + 1}月${date.getDate()}日`,
+  }
+}
+
+export function ballClass(type, kind = 'main') {
+  if (type === 'ssq' || type === 'dlt') return kind === 'special' ? 'blue' : 'red'
+  if (type === 'qxc') return kind === 'special' ? 'orange' : 'purple'
+  if (type === 'kl8') return 'orange'
+  return 'green'
+}

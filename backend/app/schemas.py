@@ -1,0 +1,82 @@
+from pydantic import BaseModel, Field
+from typing import Any, Optional
+
+
+class DrawOut(BaseModel):
+    id: int
+    lottery_type: str
+    issue: str
+    numbers: Any
+    draw_date: str = ""
+    source: str = "seed"
+
+    class Config:
+        from_attributes = True
+
+
+class RecordIn(BaseModel):
+    lottery_type: str
+    issue: str = ""
+    numbers: Any
+    cost: float = 2.0
+    prize: float = 0.0
+    note: str = ""
+    purchased_at: str = ""
+
+
+class RecordOut(RecordIn):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class RecordUpdate(BaseModel):
+    lottery_type: Optional[str] = None
+    issue: Optional[str] = None
+    numbers: Optional[Any] = None
+    cost: Optional[float] = None
+    prize: Optional[float] = None
+    note: Optional[str] = None
+    purchased_at: Optional[str] = None
+
+
+class PrizeCalcIn(BaseModel):
+    lottery_type: str
+    bet_numbers: Any
+    draw_numbers: Any = None
+    multiple: int = 1
+    play: Optional[str] = None
+    pick: Optional[int] = None
+
+
+class PredictIn(BaseModel):
+    lottery_type: str
+    strategy: str = "hot"  # hot | cold | random | hybrid
+    count: int = Field(default=1, ge=1, le=10)
+
+
+class SettingsOut(BaseModel):
+    crawl_interval_minutes: int = 60
+    subscribed_types: list[str] = []
+    mail_enabled: bool = False
+    mail_to: str = ""
+    smtp_configured: bool = False
+
+
+class SettingsIn(BaseModel):
+    crawl_interval_minutes: Optional[int] = None
+    subscribed_types: Optional[list[str]] = None
+    mail_enabled: Optional[bool] = None
+    mail_to: Optional[str] = None
+
+
+class MailTestIn(BaseModel):
+    to: Optional[str] = None
+
+
+class MailPredictIn(BaseModel):
+    to: Optional[str] = None
+    lottery_type: str
+    strategy: str = ""
+    recommendations: list[Any] = []

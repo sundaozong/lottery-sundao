@@ -1,0 +1,183 @@
+<template>
+  <div>
+    <div class="page-header">
+      <div>
+        <h1>预测 / 推荐</h1>
+        <p>策略生成号码 · 不保证任何中奖可能</p>
+      </div>
+    </div>
+
+    <div class="alert alert-disclaimer">
+      <span>·</span>
+      <div>
+        <strong>仅供娱乐。</strong>冷热/随机/混合策略均基于历史样本的统计玩具，
+        <strong>不构成投注建议</strong>，亦不保证中奖。请理性购彩，量力而行。
+      </div>
+    </div>
+
+    <div class="predict-layout">
+      <div class="predict-main">
+        <div class="card mb-4">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">彩种</label>
+              <select v-model="lotteryType" class="form-select">
+                <option v-for="(name, key) in TYPE_NAMES" :key="key" :value="key">{{ name }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">策略</label>
+              <select v-model="strategy" class="form-select">
+                <option value="hot">热号加权</option>
+                <option value="cold">冷号加权</option>
+                <option value="hybrid">冷热混合</option>
+                <option value="random">纯随机</option>
+              </select>
+              <p class="strategy-desc">{{ strategyHint }}</p>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">组数</label>
+              <input v-model.number="count" class="form-input" type="number" min="1" max="10" />
+            </div>
+            <div class="form-group predict-actions">
+              <button class="btn btn-primary" type="button" :disabled="loading" @click="run">
+                {{ loading ? '生成中…' : '生成推荐' }}
+              </button>
+              <button
+                class="btn btn-ghost"
+                type="button"
+                :disabled="!result || mailing"
+                @click="sendMail"
+              >
+                {{ mailing ? '发送中…' : '发送邮件' }}
+              </button>
+            </div>
+          </div>
+          <p v-if="mailMsg" class="form-hint mt-2">{{ mailMsg }}</p>
+        </div>
+
+        <div v-if="result" class="card mb-4">
+          <div class="card-title">
+            推荐方案
+            <span class="sub">{{ TYPE_NAMES[result.lottery_type] || result.lottery_type }} · {{ result.strategy }}</span>
+          </div>
+          <div class="predict-rows">
+            <div v-for="(rec, i) in result.recommendations" :key="i" class="predict-row">
+              <span class="predict-row-label">方案 {{ i + 1 }}</span>
+              <NumberBalls :numbers="rec" :type="result.lottery_type" />
+            </div>
+          </div>
+          <p class="text-xs text-muted mt-2">娱乐推荐 · 请勿当真</p>
+        </div>
+        <div v-if="result" class="alert alert-warn mb-4">
+          <span>·</span>
+          <div>{{ result.disclaimer }}</div>
+        </div>
+      </div>
+
+      <aside class="card predict-recent">
+        <div class="card-title">
+          {{ TYPE_NAMES[lotteryType] }} · 最近开奖
+          <span class="sub">{{ recentHint }}</span>
+        </div>
+        <div v-if="recentLoading" class="loading-line">加载开奖…</div>
+        <div v-else-if="!recent.length" class="text-muted text-sm">暂无开奖数据，请先爬取</div>
+        <div v-else class="recent-list">
+          <div v-for="d in recent" :key="d.id || d.issue" class="recent-item">
+            <div class="recent-meta">
+              <span class="recent-issue">第 {{ d.issue }} 期</span>
+              <span class="recent-date">{{ d.draw_date || '—' }}</span>
+            </div>
+            <NumberBalls :numbers="d.numbers" :type="lotteryType" size="sm" />
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
+import { api, TYPE_NAMES } from '../api'
+import NumberBalls from '../components/NumberBalls.vue'
+
+const lotteryType = ref('ssq')
+const strategy = ref('hot')
+const count = ref(3)
+const loading = ref(false)
+const mailing = ref(false)
+const mailMsg = ref('')
+const result = ref(null)
+const recent = ref([])
+const recentLoading = ref(false)
+
+const strategyHint = computed(() => ({
+  hot: '更偏向近期出现次数多的号码',
+  cold: '更偏向近期出现少的号码',
+  hybrid: '在热号基础上略保留冷号机会',
+  random: '均匀随机，与历史无关',
+}[strategy.value]))
+
+const recentHint = computed(() => {
+  if (recentLoading.value) return '加载中…'
+  if (!recent.value.length) return '无数据'
+  return `近 ${recent.value.length} 期`
+})
+
+async function loadRecent() {
+  recentLoading.value = true
+  try {
+    const data = await api.draws(lotteryType.value, 30)
+    recent.value = data.items || []
+  } catch (e) {
+    recent.value = []
+    console.error(e)
+  } finally {
+    recentLoading.value = false
+  }
+}
+
+async function run() {
+  loading.value = true
+  mailMsg.value = ''
+  try {
+    result.value = await api.predict({
+      lottery_type: lotteryType.value,
+      strategy: strategy.value,
+      count: count.value,
+    })
+  } catch (e) {
+    alert(e.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function sendMail() {
+  if (!result.value) return
+  mailing.value = true
+  mailMsg.value = ''
+  try {
+    const res = await api.mailPredict({
+      lottery_type: result.value.lottery_type,
+      strategy: result.value.strategy,
+      recommendations: result.value.recommendations,
+    })
+    mailMsg.value = res.ok ? (res.message || '已发送') : (res.error || '发送失败')
+  } catch (e) {
+    mailMsg.value = e.message
+  } finally {
+    mailing.value = false
+  }
+}
+
+watch(lotteryType, () => {
+  result.value = null
+  mailMsg.value = ''
+  loadRecent()
+})
+
+onMounted(loadRecent)
+</script>
