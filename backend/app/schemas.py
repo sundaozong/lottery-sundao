@@ -66,6 +66,16 @@ class EchoIn(BaseModel):
     top: int = Field(default=8, ge=1, le=20)
 
 
+class CollisionTicket(BaseModel):
+    main: Any = None
+    special: Any = None
+
+
+class CollisionIn(BaseModel):
+    tickets: list[CollisionTicket] = Field(default_factory=list)
+    from_records: bool = False
+
+
 class PredictIn(BaseModel):
     lottery_type: str
     strategy: str = "hot"  # hot | cold | random | hybrid
