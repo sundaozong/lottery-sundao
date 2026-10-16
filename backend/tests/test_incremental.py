@@ -411,6 +411,181 @@ def test_empty_backtest_and_export(client):
     assert shape.json()["mode"] == "set"
 
 
+def test_echo_ssq_ranks_shared_sets_and_exact_match(client, db):
+    _draw(db, "ssq", "2026001", ["01", "02", "03", "10", "20", "30"], ["16"], "2026-10-01")
+    _draw(db, "ssq", "2026002", ["01", "02", "03", "04", "05", "07"], ["08"], "2026-10-03")
+    exact = _draw(db, "ssq", "2026003", ["01", "02", "03", "04", "05", "06"], ["16"], "2026-10-05")
+    exact.source = "crawl"
+    db.commit()
+    _draw(db, "ssq", "2026004", ["21", "22", "23", "24", "25", "26"], ["02"], "2026-10-07")
+    _draw(db, "ssq", "2026005", ["01", "02", "03", "21", "22", "23"], ["09"], "2026-10-02")
+    _draw(db, "ssq", "2026006", ["04", "05", "06", "21", "22", "23"], ["09"], "2026-10-04")
+    _draw(db, "ssq", "2026007", ["01", "02", "03", "24", "25", "26"], ["09"], "2026-10-04")
+
+    res = client.post(
+        "/api/analysis/ssq/echo",
+        json={"main": [6, 5, 4, "03", "02", 1], "special": ["16"]},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert set(body) == {
+        "lottery_type",
+        "query",
+        "sample_size",
+        "top",
+        "mode",
+        "echoes",
+        "disclaimer",
+        "data_status",
+    }
+    assert body["lottery_type"] == "ssq"
+    assert body["mode"] == "set"
+    assert body["sample_size"] == 7
+    assert body["top"] == 8
+    assert body["data_status"] == "mixed"
+    assert body["query"] == {"main": ["06", "05", "04", "03", "02", "01"], "special": ["16"]}
+    assert body["disclaimer"] == "回声对照仅供娱乐，不代表下期结果；请理性购彩。"
+    assert [row["issue"] for row in body["echoes"]] == [
+        "2026003",
+        "2026002",
+        "2026001",
+        "2026007",
+        "2026006",
+        "2026005",
+    ]
+    best = body["echoes"][0]
+    assert set(best) == {
+        "issue",
+        "draw_date",
+        "main",
+        "special",
+        "main_shared",
+        "special_shared",
+        "score",
+        "shared_main",
+        "shared_special",
+        "exact_match",
+    }
+    assert best["exact_match"] is True
+    assert best["main_shared"] == 6
+    assert best["special_shared"] == 1
+    assert best["score"] == 61
+    assert best["shared_main"] == ["01", "02", "03", "04", "05", "06"]
+    assert best["shared_special"] == ["16"]
+    assert best["draw_date"] == "2026-10-05"
+    assert body["echoes"][1]["main_shared"] == 5
+    assert body["echoes"][1]["special_shared"] == 0
+    assert body["echoes"][1]["score"] == 50
+    assert body["echoes"][1]["exact_match"] is False
+    assert body["echoes"][2]["score"] == 31
+    assert body["echoes"][2]["shared_main"] == ["01", "02", "03"]
+    assert all(row["score"] > 0 for row in body["echoes"])
+
+    analysis = client.get("/api/analysis/ssq")
+    assert analysis.status_code == 200
+    assert set(analysis.json()) == {
+        "lottery_type",
+        "sample_size",
+        "main_freq",
+        "special_freq",
+        "main_omit",
+        "special_omit",
+        "hot_main",
+        "cold_main",
+        "heatmap",
+        "history",
+        "data_status",
+        "disclaimer",
+    }
+
+    newest = client.post(
+        "/api/analysis/ssq/echo",
+        json={"main": "01 02 03 04 05 06", "special": "16", "limit": 2, "top": 1},
+    )
+    assert newest.status_code == 200
+    window = newest.json()
+    assert window["sample_size"] == 2
+    assert window["top"] == 1
+    assert [row["issue"] for row in window["echoes"]] == ["2026007"]
+    assert window["echoes"][0]["exact_match"] is False
+
+
+def test_echo_fc3d_matches_positions_not_sets(client, db):
+    _draw(db, "fc3d", "2026101", ["1", "2", "9"], [], "2026-01-01")
+    _draw(db, "fc3d", "2026102", ["1", "9", "3"], [], "2026-01-02")
+    _draw(db, "fc3d", "2026103", ["1", "2", "3"], [], "2026-01-03")
+    _draw(db, "fc3d", "2026104", ["3", "2", "1"], [], "2026-01-04")
+    _draw(db, "fc3d", "2026105", ["9", "8", "7"], [], "2026-01-05")
+
+    res = client.post("/api/analysis/fc3d/echo", json={"main": ["01", "02", "03"]})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["mode"] == "digit"
+    assert body["query"] == {"main": ["1", "2", "3"], "special": []}
+    assert body["sample_size"] == 5
+    assert body["data_status"] == "seed"
+    assert [row["issue"] for row in body["echoes"]] == ["2026103", "2026102", "2026101", "2026104"]
+    assert body["echoes"][0]["exact_match"] is True
+    assert body["echoes"][0]["main_shared"] == 3
+    assert body["echoes"][0]["score"] == 30
+    assert body["echoes"][0]["shared_main"] == ["1", "2", "3"]
+    swapped = body["echoes"][3]
+    assert swapped["issue"] == "2026104"
+    assert swapped["main_shared"] == 1
+    assert swapped["shared_main"] == ["2"]
+    assert swapped["score"] == 10
+    assert swapped["exact_match"] is False
+    assert body["echoes"][1]["shared_main"] == ["1", "3"]
+    assert body["echoes"][2]["shared_main"] == ["1", "2"]
+
+
+def test_echo_empty_history_and_bad_numbers(client):
+    empty = client.post(
+        "/api/analysis/ssq/echo",
+        json={"main": ["01", "02", "03", "04", "05", "06"], "special": ["07"]},
+    )
+    assert empty.status_code == 200
+    body = empty.json()
+    assert body["sample_size"] == 0
+    assert body["echoes"] == []
+    assert body["mode"] == "set"
+    assert body["data_status"] == "seed"
+
+    bad = client.post("/api/analysis/ssq/echo", json={"main": ["99"], "special": ["01"]})
+    assert bad.status_code == 400
+    duplicate = client.post(
+        "/api/analysis/ssq/echo",
+        json={"main": ["01", "01", "03", "04", "05", "06"], "special": ["01"]},
+    )
+    assert duplicate.status_code == 400
+    short = client.post("/api/analysis/fc3d/echo", json={"main": ["1", "2"]})
+    assert short.status_code == 400
+    extra = client.post("/api/analysis/fc3d/echo", json={"main": ["1", "2", "3"], "special": ["4"]})
+    assert extra.status_code == 400
+    unknown = client.post("/api/analysis/nope/echo", json={"main": ["01"]})
+    assert unknown.status_code == 400
+
+    calc = client.post(
+        "/api/prize/calc",
+        json={
+            "lottery_type": "ssq",
+            "bet_numbers": {"main": ["01", "02", "03", "04", "05", "06"], "special": ["07"]},
+            "draw_numbers": {"main": ["01", "02", "03", "04", "05", "06"], "special": ["07"]},
+        },
+    )
+    assert calc.status_code == 200
+    assert calc.json()["level"] == "一等奖"
+    settings = client.get("/api/settings")
+    assert set(settings.json()) == {
+        "crawl_interval_minutes",
+        "subscribed_types",
+        "mail_enabled",
+        "mail_to",
+        "smtp_configured",
+        "lotteries",
+    }
+
+
 def test_health_and_settings_contract(client):
     health = client.get("/api/health")
     assert health.status_code == 200

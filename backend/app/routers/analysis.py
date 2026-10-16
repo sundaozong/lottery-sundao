@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
+from ..schemas import EchoIn
 from ..services.analyze import analyze
+from ..services.echo import find_echoes
 from ..services.shape import shape_stats
 from ..services.seed import ensure_seed
 from ..lotteries import normalize_type
@@ -18,6 +20,22 @@ def get_shape(
     ensure_seed(db)
     try:
         return shape_stats(db, normalize_type(lottery_type), limit=limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/{lottery_type}/echo")
+def post_echo(lottery_type: str, body: EchoIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    try:
+        return find_echoes(
+            db,
+            normalize_type(lottery_type),
+            body.main,
+            body.special,
+            limit=body.limit,
+            top=body.top,
+        )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

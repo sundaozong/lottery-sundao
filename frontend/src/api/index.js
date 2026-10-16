@@ -21,6 +21,7 @@ export const api = {
     request(`/api/draws/crawl${type ? `?lottery_type=${type}` : ''}`, { method: 'POST' }),
   analysis: (type, limit = 50) => request(`/api/analysis/${type}?limit=${limit}`),
   shape: (type, limit = 50) => request(`/api/analysis/${type}/shape?limit=${limit}`),
+  echo: (type, body) => request(`/api/analysis/${type}/echo`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),

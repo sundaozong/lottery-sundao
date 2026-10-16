@@ -59,6 +59,13 @@ class BacktestIn(BaseModel):
     limit: int = Field(default=30, ge=1, le=200)
 
 
+class EchoIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=1, le=200)
+    top: int = Field(default=8, ge=1, le=20)
+
+
 class PredictIn(BaseModel):
     lottery_type: str
     strategy: str = "hot"  # hot | cold | random | hybrid
