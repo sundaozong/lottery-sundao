@@ -66,6 +66,12 @@ class EchoIn(BaseModel):
     top: int = Field(default=8, ge=1, le=20)
 
 
+class RepeatIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None

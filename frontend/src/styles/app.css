@@ -750,3 +750,42 @@ button.ball {
   gap: 6px;
   margin: 0 12px 8px 0;
 }
+
+/* ---------- 重号脉搏 ---------- */
+.repeat-list { margin-top: 14px; }
+.repeat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.repeat-bars { margin-top: 8px; }
+.repeat-bar {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr 2rem;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.repeat-bar-track {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.repeat-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+.repeat-score { margin-top: 8px; }
+.repeat-list .ball.hit {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
