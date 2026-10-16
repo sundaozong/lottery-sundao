@@ -2,7 +2,9 @@
   <div class="app">
     <header class="topbar">
       <div class="flex gap-3" style="align-items:center">
-        <button class="menu-toggle" type="button" aria-label="菜单" @click="sidebarOpen = !sidebarOpen">☰</button>
+        <button class="menu-toggle" type="button" aria-label="打开菜单" @click="sidebarOpen = true">
+          <AppIcon name="menu" />
+        </button>
         <router-link class="brand" to="/">
           <div class="brand-mark">孙</div>
           <div>孙导带你夜夜笙歌 <span class="tag">{{ dataTag }}</span></div>
@@ -10,23 +12,32 @@
       </div>
       <div class="topbar-actions">
         <button class="btn btn-ghost btn-sm" type="button" :disabled="syncing" @click="onSync">
-          {{ syncing ? '同步中…' : '↻ 同步' }}
+          <AppIcon name="sync" :class="{ spin: syncing }" />
+          {{ syncing ? '同步中…' : '同步' }}
         </button>
-        <router-link class="btn btn-ghost btn-sm" to="/settings">设置</router-link>
+        <router-link class="btn btn-ghost btn-sm" to="/settings">
+          <AppIcon name="settings" />设置
+        </router-link>
       </div>
     </header>
 
+    <div
+      class="sidebar-backdrop"
+      :class="{ show: sidebarOpen }"
+      @click="sidebarOpen = false"
+    ></div>
+
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="nav-label">总览</div>
-      <router-link class="nav-item" to="/" @click="sidebarOpen = false"><span class="icon">◈</span> 首页</router-link>
+      <router-link class="nav-item" to="/" @click="sidebarOpen = false"><AppIcon name="home" /> 首页</router-link>
       <div class="nav-label">观测</div>
-      <router-link class="nav-item" to="/analysis" @click="sidebarOpen = false"><span class="icon">▣</span> 分析中心</router-link>
-      <router-link class="nav-item" to="/predict" @click="sidebarOpen = false"><span class="icon">✦</span> 预测 / 推荐</router-link>
+      <router-link class="nav-item" to="/analysis" @click="sidebarOpen = false"><AppIcon name="chart" /> 分析中心</router-link>
+      <router-link class="nav-item" to="/predict" @click="sidebarOpen = false"><AppIcon name="sparkle" /> 预测 / 推荐</router-link>
       <div class="nav-label">账本</div>
-      <router-link class="nav-item" to="/records" @click="sidebarOpen = false"><span class="icon">☰</span> 购买记录</router-link>
-      <router-link class="nav-item" to="/prize" @click="sidebarOpen = false"><span class="icon">¥</span> 奖金计算</router-link>
+      <router-link class="nav-item" to="/records" @click="sidebarOpen = false"><AppIcon name="list" /> 购买记录</router-link>
+      <router-link class="nav-item" to="/prize" @click="sidebarOpen = false"><AppIcon name="trophy" /> 奖金计算</router-link>
       <div class="nav-label">系统</div>
-      <router-link class="nav-item" to="/settings" @click="sidebarOpen = false"><span class="icon">⚙</span> 邮件 / 爬取</router-link>
+      <router-link class="nav-item" to="/settings" @click="sidebarOpen = false"><AppIcon name="settings" /> 邮件 / 爬取</router-link>
     </aside>
 
     <main class="main">
@@ -35,18 +46,23 @@
     </main>
 
     <nav class="mobile-tabs">
-      <router-link class="mobile-tab" to="/"><span class="mi">◈</span>首页</router-link>
-      <router-link class="mobile-tab" to="/analysis"><span class="mi">▣</span>分析</router-link>
-      <router-link class="mobile-tab" to="/predict"><span class="mi">✦</span>预测</router-link>
-      <router-link class="mobile-tab" to="/records"><span class="mi">☰</span>记录</router-link>
-      <router-link class="mobile-tab" to="/settings"><span class="mi">⚙</span>更多</router-link>
+      <router-link class="mobile-tab" to="/"><AppIcon name="home" />首页</router-link>
+      <router-link class="mobile-tab" to="/analysis"><AppIcon name="chart" />分析</router-link>
+      <router-link class="mobile-tab" to="/predict"><AppIcon name="sparkle" />预测</router-link>
+      <router-link class="mobile-tab" to="/records"><AppIcon name="list" />记录</router-link>
+      <router-link class="mobile-tab" to="/settings"><AppIcon name="settings" />更多</router-link>
     </nav>
+
+    <AppFeedback />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { api } from '../api'
+import AppIcon from './AppIcon.vue'
+import AppFeedback from './AppFeedback.vue'
+import { toast } from '../composables/feedback'
 
 const sidebarOpen = ref(false)
 const syncing = ref(false)
@@ -57,9 +73,13 @@ async function onSync() {
   try {
     const res = await api.crawl()
     dataTag.value = res.errors?.length ? '混合' : '已同步'
-    alert(res.message + (res.errors?.length ? '\n' + res.errors.slice(0, 3).join('\n') : ''))
+    if (res.errors?.length) {
+      toast(`${res.message}（${res.errors[0]}）`, 'info', 4000)
+    } else {
+      toast(res.message || '同步完成', 'ok')
+    }
   } catch (e) {
-    alert('同步失败: ' + e.message)
+    toast('同步失败：' + e.message, 'error', 4000)
   } finally {
     syncing.value = false
   }

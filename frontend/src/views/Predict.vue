@@ -8,7 +8,7 @@
     </div>
 
     <div class="alert alert-disclaimer">
-      <span>·</span>
+      <AppIcon name="info" :size="14" style="margin-top:2px;flex:none" />
       <div>
         <strong>仅供娱乐。</strong>冷热/随机/混合策略均基于历史样本的统计玩具，
         <strong>不构成投注建议</strong>，亦不保证中奖。请理性购彩，量力而行。
@@ -43,6 +43,7 @@
             </div>
             <div class="form-group predict-actions">
               <button class="btn btn-primary" type="button" :disabled="loading" @click="run">
+                <AppIcon v-if="loading" name="sync" :size="14" class="spin" />
                 {{ loading ? '生成中…' : '生成推荐' }}
               </button>
               <button
@@ -72,8 +73,13 @@
           <p class="text-xs text-muted mt-2">娱乐推荐 · 请勿当真</p>
         </div>
         <div v-if="result" class="alert alert-warn mb-4">
-          <span>·</span>
+          <AppIcon name="alert" :size="14" style="margin-top:2px;flex:none" />
           <div>{{ result.disclaimer }}</div>
+        </div>
+        <div v-else class="placeholder-card mb-4">
+          <div class="ph-icon"><AppIcon name="sparkle" :size="24" /></div>
+          <div class="ph-title">还没有推荐方案</div>
+          <div class="ph-desc">选择彩种与策略，点击「生成推荐」获取娱乐号码</div>
         </div>
       </div>
 
@@ -82,8 +88,11 @@
           {{ TYPE_NAMES[lotteryType] }} · 最近开奖
           <span class="sub">{{ recentHint }}</span>
         </div>
-        <div v-if="recentLoading" class="loading-line">加载开奖…</div>
-        <div v-else-if="!recent.length" class="text-muted text-sm">暂无开奖数据，请先爬取</div>
+        <div v-if="recentLoading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />加载开奖…</div>
+        <div v-else-if="!recent.length" class="empty" style="padding:24px 8px">
+          <div class="icon"><AppIcon name="inbox" :size="22" /></div>
+          <div class="empty-desc">暂无开奖数据，请先爬取</div>
+        </div>
         <div v-else class="recent-list">
           <div v-for="d in recent" :key="d.id || d.issue" class="recent-item">
             <div class="recent-meta">
@@ -102,6 +111,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { api, TYPE_NAMES } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
+import AppIcon from '../components/AppIcon.vue'
+import { toast } from '../composables/feedback'
 
 const lotteryType = ref('ssq')
 const strategy = ref('hot')
@@ -149,7 +160,7 @@ async function run() {
       count: count.value,
     })
   } catch (e) {
-    alert(e.message)
+    toast(e.message, 'error', 4000)
   } finally {
     loading.value = false
   }

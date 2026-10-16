@@ -20,6 +20,7 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 # 福彩公开 JSON
 CWL_NAME = {
     "ssq": "ssq",
+    "qlc": "qlc",
     "fc3d": "3d",
     "kl8": "kl8",
 }
@@ -66,7 +67,7 @@ def _parse_cwl_result(name: str, data: dict) -> list[dict]:
     for item in data.get("result", []) or []:
         code = str(item.get("code") or item.get("issue") or "")
         date = str(item.get("date") or item.get("drawTime") or "")[:10]
-        if name == "ssq":
+        if name in ("ssq", "qlc"):
             red = (item.get("red") or "").replace(",", " ").split()
             blue = (item.get("blue") or "").split()
             nums = {

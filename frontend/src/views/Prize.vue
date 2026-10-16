@@ -8,7 +8,7 @@
     </div>
 
     <div class="alert alert-info">
-      <span>·</span>
+      <AppIcon name="info" :size="14" style="margin-top:2px;flex:none" />
       <div>浮动奖按示意金额估算；固定奖按公开规则。实际以官方兑奖为准。</div>
     </div>
 
@@ -45,6 +45,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api, TYPE_NAMES } from '../api'
 import BetFields from '../components/BetFields.vue'
+import AppIcon from '../components/AppIcon.vue'
 
 const lotteryType = ref('ssq')
 const drawText = ref('')

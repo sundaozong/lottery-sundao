@@ -52,9 +52,9 @@ def generate(db: Session, lottery_type: str, strategy: str = "hot", count: int =
             return [((c + 1) * 0.6 + 1) for c in counts]
         return [1.0] * len(freq)
 
-    need_main = {"ssq": 6, "dlt": 5, "fc3d": 3, "pl3": 3, "pl5": 5, "qxc": 6, "kl8": 20}.get(t, 6)
+    need_main = {"ssq": 6, "dlt": 5, "fc3d": 3, "pl3": 3, "pl5": 5, "qxc": 6, "qlc": 7, "kl8": 20}.get(t, 6)
     need_spec = {"ssq": 1, "dlt": 2, "qxc": 1}.get(t, 0)
-    width = 2 if t in ("ssq", "dlt", "kl8") else 0
+    width = 2 if t in ("ssq", "dlt", "qlc", "kl8") else 0
 
     # 数字彩：按位独立时仍用同一数字池，允许重复
     allow_dup = t in ("fc3d", "pl3", "pl5", "qxc")

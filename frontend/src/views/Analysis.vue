@@ -19,7 +19,7 @@
     </div>
 
     <div class="alert alert-info" v-if="data">
-      <span>·</span>
+      <AppIcon name="info" :size="14" style="margin-top:2px;flex:none" />
       <div>
         样本 {{ data.sample_size }} 期 · 数据状态
         <strong>{{ data.data_status === 'seed' ? '示例/种子' : '混合/爬取' }}</strong>
@@ -32,7 +32,7 @@
         开奖结果
         <span class="sub">{{ TYPE_NAMES[type] }} · 基本走势（开出为彩球，灰字为遗漏）</span>
       </div>
-      <div v-if="drawsLoading" class="loading-line">加载开奖…</div>
+      <div v-if="drawsLoading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />加载开奖…</div>
       <TrendChart
         v-else
         :type="type"
@@ -42,7 +42,7 @@
       />
     </div>
 
-    <div v-if="loading" class="loading-line">分析中…</div>
+    <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
         <div class="card">
@@ -115,6 +115,7 @@ import { useRoute } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import TrendChart from '../components/TrendChart.vue'
+import AppIcon from '../components/AppIcon.vue'
 
 const route = useRoute()
 const type = ref(route.query.type || 'ssq')

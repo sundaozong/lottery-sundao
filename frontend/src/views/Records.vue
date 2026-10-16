@@ -6,7 +6,8 @@
         <p>流水 · 盈亏汇总 · CRUD</p>
       </div>
       <button class="btn btn-primary btn-sm" type="button" @click="openForm">
-        {{ showForm ? '收起' : '+ 记一笔' }}
+        <AppIcon :name="showForm ? 'x' : 'plus'" :size="13" />
+        {{ showForm ? '收起' : '记一笔' }}
       </button>
     </div>
 
@@ -75,14 +76,14 @@
         </div>
       </div>
       <div class="form-actions">
-        <button class="btn btn-primary" type="button" @click="save">保存</button>
+        <button class="btn btn-primary" type="button" @click="save"><AppIcon name="check" :size="14" />保存</button>
         <button class="btn btn-ghost" type="button" @click="resetForm">取消</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap table-wrap-plain">
+        <table class="records-table">
           <thead>
             <tr>
               <th>彩种</th><th>期号</th><th>号码</th><th>投入</th><th>奖金</th><th>盈亏</th><th>日期</th><th></th>
@@ -101,13 +102,23 @@
               <td class="mono" :class="r.profit >= 0 ? 'profit-pos' : 'profit-neg'">{{ r.profit }}</td>
               <td class="text-xs">{{ r.purchased_at }}</td>
               <td>
-                <button class="btn btn-ghost btn-sm" type="button" @click="edit(r)">改</button>
-                <button class="btn btn-danger btn-sm" type="button" @click="remove(r.id)">删</button>
+                <span class="row-actions">
+                  <button class="icon-btn" type="button" title="编辑" aria-label="编辑这条记录" @click="edit(r)">
+                    <AppIcon name="edit" />
+                  </button>
+                  <button class="icon-btn danger" type="button" title="删除" aria-label="删除这条记录" @click="remove(r.id)">
+                    <AppIcon name="trash" />
+                  </button>
+                </span>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="!items.length" class="empty"><div class="icon">☰</div>暂无记录</div>
+        <div v-if="!items.length" class="empty">
+          <div class="icon"><AppIcon name="inbox" :size="22" /></div>
+          <div class="empty-title">暂无记录</div>
+          <div class="empty-desc">点击右上角「记一笔」开始记账</div>
+        </div>
       </div>
     </div>
   </div>
@@ -118,6 +129,8 @@ import { computed, nextTick, ref, watch, onMounted } from 'vue'
 import { api, TYPE_NAMES } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import BetFields from '../components/BetFields.vue'
+import AppIcon from '../components/AppIcon.vue'
+import { toast, confirmDialog } from '../composables/feedback'
 
 const items = ref([])
 const summary = ref({})
@@ -305,20 +318,28 @@ async function save() {
     note: form.value.note,
     purchased_at: form.value.purchased_at,
   }
+  const wasEditing = Boolean(editingId.value)
   try {
-    if (editingId.value) await api.updateRecord(editingId.value, body)
+    if (wasEditing) await api.updateRecord(editingId.value, body)
     else await api.createRecord(body)
     resetForm()
     await load()
+    toast(wasEditing ? '记录已更新' : '记录已保存', 'ok')
   } catch (e) {
-    alert(e.message)
+    toast(e.message, 'error', 4000)
   }
 }
 
 async function remove(id) {
-  if (!confirm('确认删除？')) return
+  const ok = await confirmDialog({
+    title: '删除记录',
+    message: '确认删除这条购买记录？此操作不可撤销。',
+    confirmText: '删除',
+  })
+  if (!ok) return
   await api.deleteRecord(id)
   await load()
+  toast('记录已删除', 'ok')
 }
 
 onMounted(load)

@@ -8,7 +8,11 @@
     </div>
 
     <div class="alert" :class="settings.smtp_configured ? 'alert-ok' : 'alert-warn'">
-      <span>·</span>
+      <AppIcon
+        :name="settings.smtp_configured ? 'checkCircle' : 'alert'"
+        :size="14"
+        style="margin-top:2px;flex:none"
+      />
       <div>
         SMTP
         <strong>{{ settings.smtp_configured ? '已配置（环境变量）' : '未配置' }}</strong>
@@ -38,6 +42,7 @@
           </div>
         </div>
         <button class="btn btn-ghost" type="button" :disabled="crawling" @click="doCrawl">
+          <AppIcon v-if="crawling" name="sync" :size="14" class="spin" />
           {{ crawling ? '爬取中…' : '立即爬取' }}
         </button>
         <p v-if="crawlMsg" class="form-hint mt-2">{{ crawlMsg }}</p>
@@ -50,27 +55,39 @@
             <div class="text-sm">启用推送开关</div>
             <div class="text-xs text-muted">本地标记；实际发送仍需 SMTP</div>
           </div>
-          <div class="switch" :class="{ on: settings.mail_enabled }" @click="settings.mail_enabled = !settings.mail_enabled"></div>
+          <div
+            class="switch"
+            :class="{ on: settings.mail_enabled }"
+            role="switch"
+            tabindex="0"
+            :aria-checked="settings.mail_enabled"
+            aria-label="启用邮件推送"
+            @click="settings.mail_enabled = !settings.mail_enabled"
+            @keydown.enter.prevent="settings.mail_enabled = !settings.mail_enabled"
+            @keydown.space.prevent="settings.mail_enabled = !settings.mail_enabled"
+          ></div>
         </div>
         <div class="form-group mt-3">
           <label class="form-label">收件邮箱</label>
           <input v-model="settings.mail_to" class="form-input" placeholder="you@example.com" />
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" type="button" @click="testMail">发送测试邮件</button>
-          <button class="btn btn-ghost" type="button" @click="digestMail">推送开奖摘要</button>
+          <button class="btn btn-ghost" type="button" @click="testMail"><AppIcon name="mail" :size="14" />发送测试邮件</button>
+          <button class="btn btn-ghost" type="button" @click="digestMail"><AppIcon name="mail" :size="14" />推送开奖摘要</button>
         </div>
         <p v-if="mailMsg" class="form-hint mt-2">{{ mailMsg }}</p>
       </div>
     </div>
 
-    <button class="btn btn-primary" type="button" @click="save">保存设置</button>
+    <button class="btn btn-primary" type="button" @click="save"><AppIcon name="check" :size="14" />保存设置</button>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { api, TYPE_NAMES } from '../api'
+import AppIcon from '../components/AppIcon.vue'
+import { toast } from '../composables/feedback'
 
 const settings = ref({
   crawl_interval_minutes: 60,
@@ -98,9 +115,9 @@ async function save() {
       mail_enabled: settings.value.mail_enabled,
       mail_to: settings.value.mail_to,
     })
-    alert('已保存')
+    toast('设置已保存', 'ok')
   } catch (e) {
-    alert(e.message)
+    toast(e.message, 'error', 4000)
   }
 }
 

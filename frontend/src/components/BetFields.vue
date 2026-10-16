@@ -84,7 +84,7 @@
       </template>
 
       <div v-if="hitView" class="prize-hits" :class="{ empty: !hitView.hasHit }">
-        <div class="prize-hits-label">命中号码<span v-if="hitView.hasHit"> · {{ hitView.count }}</span></div>
+        <div class="prize-hits-label"><AppIcon name="checkCircle" :size="15" />命中号码<span v-if="hitView.hasHit"> · {{ hitView.count }}</span></div>
         <NumberBalls v-if="hitView.hasHit" :numbers="hitView.hits" :type="lotteryType" size="xl" />
         <div v-else class="prize-hits-empty">没有命中的号码</div>
       </div>
@@ -143,6 +143,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import NumberBalls from './NumberBalls.vue'
 import NumberPad from './NumberPad.vue'
+import AppIcon from './AppIcon.vue'
 
 const PICK = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
 
@@ -248,6 +249,28 @@ function buildHitView(type, res) {
   const betSpecial = asList(bet.special)
   const drawMain = asList(draw.main)
   const drawSpecial = asList(draw.special)
+  if (type === 'qlc') {
+    const basic = new Set(drawMain)
+    const special = new Set(drawSpecial)
+    const betMarks = { main: betMain.map((n) => basic.has(n) || special.has(n)) }
+    const hits = {
+      main: betMain.filter((n) => basic.has(n)),
+      special: betMain.filter((n) => special.has(n)),
+    }
+    const count = hits.main.length + hits.special.length
+    return {
+      hasHit: count > 0,
+      count,
+      hits,
+      betNumbers: { main: betMain },
+      betMarks,
+      drawNumbers: { main: drawMain, special: drawSpecial },
+      drawMarks: {
+        main: drawMain.map((n) => betMain.includes(n)),
+        special: drawSpecial.map((n) => betMain.includes(n)),
+      },
+    }
+  }
   const betMarks = { main: setFlags(betMain, drawMain), special: setFlags(betSpecial, drawSpecial) }
   const drawMarks = { main: setFlags(drawMain, betMain), special: setFlags(drawSpecial, betSpecial) }
   const hits = {
@@ -290,6 +313,7 @@ function poolOf(key) {
   const pools = {
     ssq: { main: { from: 1, to: 33, pad: 2, color: 'red' }, special: { from: 1, to: 16, pad: 2, color: 'blue' } },
     dlt: { main: { from: 1, to: 35, pad: 2, color: 'red' }, special: { from: 1, to: 12, pad: 2, color: 'blue' } },
+    qlc: { main: { from: 1, to: 30, pad: 2, color: 'red' } },
     kl8: { main: { from: 1, to: 80, pad: 2, color: 'orange' } },
     fc3d: { main: { from: 0, to: 9, pad: 1, color: 'green' } },
     pl3: { main: { from: 0, to: 9, pad: 1, color: 'green' } },
@@ -307,6 +331,9 @@ function limitOf(key) {
   if (type === 'dlt') {
     if (play === 'single') return key === 'main' ? { min: 5, max: 5 } : { min: 2, max: 2 }
     return key === 'main' ? { min: 5, max: 20 } : { min: 2, max: 12 }
+  }
+  if (type === 'qlc') {
+    return play === 'single' ? { min: 7, max: 7 } : { min: 8, max: 16 }
   }
   if (type === 'kl8') {
     const pick = Number(props.playState.pick) || 1

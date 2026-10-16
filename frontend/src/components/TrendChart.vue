@@ -30,7 +30,7 @@
         >
           <polyline
             fill="none"
-            stroke="rgba(90, 140, 220, 0.85)"
+            stroke="var(--trend-line, rgba(74, 120, 184, 0.5))"
             stroke-width="1.6"
             :points="blueLine.map((p) => `${p.x},${p.y}`).join(' ')"
           />
@@ -205,6 +205,11 @@ const POOLS = {
   pl3: { main: range(0, 9, 1), special: [], zones: [] },
   pl5: { main: range(0, 9, 1), special: [], zones: [] },
   qxc: { main: range(0, 9, 1), special: range(0, 14, 1), zones: [] },
+  qlc: {
+    main: range(1, 30, 2),
+    special: range(1, 30, 2),
+    zones: [[1, 10, '一区'], [11, 20, '二区'], [21, 30, '三区']],
+  },
   kl8: {
     main: range(1, 80, 2),
     special: [],

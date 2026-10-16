@@ -41,6 +41,7 @@ export const TYPE_NAMES = {
   pl3: '排列三',
   pl5: '排列五',
   qxc: '七星彩',
+  qlc: '七乐彩',
   kl8: '快乐八',
 }
 
@@ -52,6 +53,7 @@ export const DRAW_WEEKDAYS = {
   pl3: null,
   pl5: null,
   qxc: [0, 2, 5],
+  qlc: [1, 3, 5],
   kl8: null,
 }
 
@@ -75,7 +77,7 @@ export function lotteriesOn(date = new Date()) {
 }
 
 export function ballClass(type, kind = 'main') {
-  if (type === 'ssq' || type === 'dlt') return kind === 'special' ? 'blue' : 'red'
+  if (type === 'ssq' || type === 'dlt' || type === 'qlc') return kind === 'special' ? 'blue' : 'red'
   if (type === 'qxc') return kind === 'special' ? 'orange' : 'purple'
   if (type === 'kl8') return 'orange'
   return 'green'

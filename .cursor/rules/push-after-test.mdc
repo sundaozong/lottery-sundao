@@ -1,0 +1,13 @@
+---
+description: After code changes are implemented and tested, commit and push to the remote.
+alwaysApply: true
+---
+
+# Push after testing
+
+When a coding task is implemented and the relevant checks have passed, commit the source changes and push them to the tracked remote.
+
+- Do this at the end of the task, without waiting for a separate push request.
+- Leave out local screenshots, audit images, and secret files.
+- Do not force-push, skip hooks, or change git config.
+- If the push fails because of authentication or a rejected update, say so and stop.

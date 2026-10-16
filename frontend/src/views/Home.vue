@@ -27,7 +27,7 @@
     </div>
 
     <div class="alert alert-disclaimer">
-      <span>·</span>
+      <AppIcon name="info" :size="14" style="margin-top:2px;flex:none" />
       <div>个人观测站 · 开奖可能为<strong>种子/爬取</strong>数据；预测<strong>仅供娱乐</strong>，请勿据此决策。</div>
     </div>
 
@@ -54,19 +54,21 @@
 
     <div class="mb-4">
       <div class="quick-grid">
-        <router-link class="quick-item" to="/analysis"><span class="qi">▣</span>分析走势</router-link>
-        <router-link class="quick-item" to="/predict"><span class="qi">✦</span>今日推荐</router-link>
-        <router-link class="quick-item" to="/records"><span class="qi">☰</span>记一笔</router-link>
-        <router-link class="quick-item" to="/prize"><span class="qi">¥</span>算奖金</router-link>
+        <router-link class="quick-item" to="/analysis"><AppIcon name="chart" />分析走势</router-link>
+        <router-link class="quick-item" to="/predict"><AppIcon name="sparkle" />今日推荐</router-link>
+        <router-link class="quick-item" to="/records"><AppIcon name="plus" />记一笔</router-link>
+        <router-link class="quick-item" to="/prize"><AppIcon name="trophy" />算奖金</router-link>
       </div>
     </div>
 
-    <div class="card mb-4">
-      <div class="card-title">
-        各彩种最新开奖
+    <div class="mb-4">
+      <div class="section-head">
+        <span>各彩种最新开奖</span>
         <span class="sub">{{ statusHint }}</span>
       </div>
-      <div v-if="loading" class="loading-line">加载中…</div>
+      <div v-if="loading" class="loading-line">
+        <AppIcon name="sync" :size="15" class="spin" />加载中…
+      </div>
       <div v-else class="grid grid-auto">
         <router-link
           v-for="d in draws"
@@ -75,7 +77,10 @@
           :to="`/analysis?type=${d.lottery_type}`"
         >
           <div class="lottery-name">{{ d.name }}</div>
-          <div class="issue">第 {{ d.issue }} 期 · {{ d.source === 'crawl' ? '爬取' : '示例' }}</div>
+          <div class="issue">
+            第 {{ d.issue }} 期
+            <span class="source-badge" :class="{ crawl: d.source === 'crawl' }">{{ d.source === 'crawl' ? '爬取' : '示例' }}</span>
+          </div>
           <NumberBalls :numbers="d.numbers" :type="d.lottery_type" />
           <div class="meta">
             <span>{{ d.draw_date || '—' }}</span>
@@ -91,6 +96,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { api, lotteriesOn } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
+import AppIcon from '../components/AppIcon.vue'
 
 const schedule = lotteriesOn()
 const draws = ref([])

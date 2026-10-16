@@ -19,6 +19,9 @@ def _pool(lottery_type: str) -> tuple[list[str], list[str]]:
         return [str(i) for i in range(10)], []
     if t == "qxc":
         return [str(i) for i in range(10)], [str(i) for i in range(15)]
+    if t == "qlc":
+        nums = [f"{i:02d}" for i in range(1, 31)]
+        return nums, nums
     if t == "kl8":
         return [f"{i:02d}" for i in range(1, 81)], []
     return [], []

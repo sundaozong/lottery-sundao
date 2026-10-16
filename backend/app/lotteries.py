@@ -40,6 +40,12 @@ LOTTERIES = {
         "special_color": "orange",
         "desc": "6位+1特别号",
     },
+    "qlc": {
+        "name": "七乐彩",
+        "ball_color": "red",
+        "special_color": "blue",
+        "desc": "7个号+特别号",
+    },
     "kl8": {
         "name": "快乐八",
         "ball_color": "orange",

@@ -61,6 +61,17 @@ KL8_HITS = {
     1: [(1, "中1", "一等奖", 4.6, False)],
 }
 
+# (基本号命中, 是否含特别号) → 条件、奖级、示意金额、是否浮动
+QLC_ROWS = [
+    ((7, 0), "7个基本号", "一等奖", 500_000, True),
+    ((6, 1), "6个基本号+特别号", "二等奖", 20_000, True),
+    ((6, 0), "6个基本号", "三等奖", 2_000, True),
+    ((5, 1), "5个基本号+特别号", "四等奖", 200, False),
+    ((5, 0), "5个基本号", "五等奖", 50, False),
+    ((4, 1), "4个基本号+特别号", "六等奖", 10, False),
+    ((4, 0), "4个基本号", "七等奖", 5, False),
+]
+
 QXC_ROWS = [
     ("7位全中", "一等奖", 5_000_000, True),
     ("前6位全中", "二等奖", 100_000, True),
@@ -167,7 +178,7 @@ def play_name(lottery_type: str, bet: dict, bets: int = 1) -> str:
         if t in ("fc3d", "pl3", "pl5"):
             return "直选"
         return "单式"
-    if play in ("single", "compound") and t in ("ssq", "dlt", "qxc"):
+    if play in ("single", "compound") and t in ("ssq", "dlt", "qxc", "qlc"):
         return "复式" if play == "compound" or bets > 1 else "单式"
     return PLAY_NAMES.get(play, play)
 
@@ -183,6 +194,8 @@ def _table_for(t: str, pick: Optional[int] = None) -> list[dict]:
         return [_row("5位按位全中", "直选", 100_000, False)]
     if t == "qxc":
         return [_row(c, lv, amt, fl) for c, lv, amt, fl in QXC_ROWS]
+    if t == "qlc":
+        return [_row(c, lv, amt, fl) for _, c, lv, amt, fl in QLC_ROWS]
     if t == "kl8":
         n = int(pick or 10)
         rows = KL8_HITS.get(n) or []
@@ -237,6 +250,14 @@ def prize_rules() -> dict:
                 {"id": "direct_compound", "name": "直选复式", "hint": "至少一位选 2 个及以上数字", "inputs": pl5_compound},
             ],
             "table": _table_for("pl5"),
+        },
+        "qlc": {
+            "note": "从 01–30 选 7 个号码，开奖为 7 个基本号加 1 个特别号。复式选 8–16 个。一至三等奖为浮动示意，四至七等奖为固定奖。未计胆拖。",
+            "plays": [
+                {"id": "single", "name": "单式", "hint": "选 7 个号码", "inputs": [_inputs_ball("main", "号码", "03 08 12 18 21 25 29")]},
+                {"id": "compound", "name": "复式", "hint": "选 8–16 个号码，每 7 个一组", "inputs": [_inputs_ball("main", "号码", "03 08 12 16 18 21 25 29")]},
+            ],
+            "table": _table_for("qlc"),
         },
         "qxc": {
             "note": "前 6 位 0–9，特别号 0–14。一、二等奖为浮动示意，其余为固定奖。",
@@ -294,6 +315,8 @@ def normalize_bet(lottery_type: str, bet_numbers: Any, play: Optional[str] = Non
         return _norm_positional(t, chosen, raw, mult, 5, 0, 9, "排列五")
     if t == "qxc":
         return _norm_qxc(chosen, raw, mult)
+    if t == "qlc":
+        return _norm_qlc(chosen, raw, mult)
     if t == "kl8":
         return _norm_kl8(raw, pick_n, mult)
     raise ValueError("未知彩种")
@@ -316,6 +339,9 @@ def _infer_play(t: str, raw: dict) -> str:
         return "direct"
     if t == "qxc":
         return "single"
+    if t == "qlc":
+        mains = raw.get("main") or []
+        return "compound" if isinstance(mains, list) and len(mains) > 7 else "single"
     return "single"
 
 
@@ -374,6 +400,48 @@ def _norm_positional(t, play, raw, multiple, count, lo, hi, label) -> dict:
         raise ValueError(f"注数 {bets} 超过上限 {MAX_BETS}")
     flat = [n for pos in sets for n in pos]
     return {"play": play, "main": flat, "special": [], "positions": sets, "pick": None, "multiple": multiple}
+
+
+def _norm_qlc(play, raw, multiple) -> dict:
+    if play not in ("single", "compound"):
+        play = "single"
+    nums = _balls(raw.get("main"), 2, 1, 30, "号码")
+    if play == "single":
+        if len(nums) != 7:
+            raise ValueError("单式需要 7 个号码")
+    else:
+        if not (8 <= len(nums) <= 16):
+            raise ValueError("复式需要 8–16 个号码")
+        if comb(len(nums), 7) > MAX_BETS:
+            raise ValueError(f"注数超过上限 {MAX_BETS}")
+    return {"play": play, "main": nums, "special": [], "positions": [], "pick": None, "multiple": multiple}
+
+
+def _score_qlc(bet, draw_numbers):
+    draw_main, draw_special = _draw_pair(draw_numbers, 2, 1, 30, "基本号", "特别号", 1, 30)
+    if len(draw_main) < 7 or len(draw_special) < 1:
+        raise ValueError("七乐彩开奖号码不完整")
+    draw_main, draw_special = draw_main[:7], draw_special[:1]
+    selected = set(bet["main"])
+    basic_hit = len(selected & set(draw_main))
+    special_hit = len(selected & (set(draw_special) - set(draw_main)))
+    miss = len(bet["main"]) - basic_hit - special_hit
+    bets = comb(len(bet["main"]), 7)
+    _check_bets(bets)
+    breakdown = []
+    for (need_h, need_s), condition, level, unit, floating in QLC_ROWS:
+        rest = 7 - need_h - need_s
+        count = comb(basic_hit, need_h) * comb(special_hit, need_s) * comb(miss, rest)
+        if count:
+            breakdown.append({
+                "condition": condition,
+                "level": level,
+                "count": count,
+                "unit": unit,
+                "floating": floating,
+                "amount": count * unit,
+            })
+    return bets, breakdown, basic_hit, special_hit, {"main": draw_main, "special": draw_special}
 
 
 def _norm_qxc(play, raw, multiple) -> dict:
@@ -547,6 +615,8 @@ def _score(bet: dict, draw_numbers: Any) -> tuple[int, list[dict], int, int, Opt
         return _score_direct(bet, draw_main[:5], 100_000, "5位按位全中", "直选")
     if t == "qxc":
         return _score_qxc(bet, draw_numbers)
+    if t == "qlc":
+        return _score_qlc(bet, draw_numbers)
     raise ValueError("未知彩种")
 
 
@@ -555,6 +625,8 @@ def _bet_count(bet: dict) -> int:
     if play in ("single", "compound") and bet["lottery_type"] in ("ssq", "dlt"):
         need = (6, 1) if bet["lottery_type"] == "ssq" else (5, 2)
         return comb(len(bet["main"]), need[0]) * comb(len(bet["special"]), need[1])
+    if bet["lottery_type"] == "qlc":
+        return comb(len(bet["main"]), 7)
     if play in ("direct", "direct_compound") or (bet["lottery_type"] == "qxc" and bet.get("positions")):
         bets = 1
         for pos in bet["positions"]:
