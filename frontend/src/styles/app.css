@@ -669,3 +669,41 @@
   outline-offset: 2px;
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
+
+/* ---------- 号码结伴 ---------- */
+.affinity-list { margin-top: 14px; }
+.affinity-block { margin-top: 16px; }
+.affinity-block .card-title { margin-bottom: 0; }
+.affinity-pair,
+.affinity-companion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.affinity-side {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.affinity-anchor { padding-top: 10px; }
+.affinity-note {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+button.ball {
+  padding: 0;
+  appearance: none;
+}
+.ball.pick { cursor: pointer; }
+.ball.pick:hover { filter: brightness(1.08); }
+.ball.pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

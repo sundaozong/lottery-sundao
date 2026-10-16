@@ -3,32 +3,41 @@
     <template v-if="positionGroups.length">
       <span v-for="(group, i) in positionGroups" :key="'p' + i" class="pos-group">
         <span class="pos-label">{{ group.label }}</span>
-        <span
+        <component
+          :is="interactive ? 'button' : 'span'"
           v-for="(n, j) in group.nums"
           :key="j"
           class="ball"
-          :class="[group.kind, size, markClass(positionFlags(i), j)]"
+          :class="[group.kind, size, markClass(positionFlags(i), j), interactive ? 'pick' : '']"
+          :type="interactive ? 'button' : undefined"
           :title="markTitle(positionFlags(i), j)"
-        >{{ n }}</span>
+          @click="onPick(n)"
+        >{{ n }}</component>
       </span>
     </template>
     <template v-else>
-      <span
+      <component
+        :is="interactive ? 'button' : 'span'"
         v-for="(n, i) in numbers.main || []"
         :key="'m' + i"
         class="ball"
-        :class="[mainClass, size, markClass(marks && marks.main, i)]"
+        :class="[mainClass, size, markClass(marks && marks.main, i), interactive ? 'pick' : '']"
+        :type="interactive ? 'button' : undefined"
         :title="markTitle(marks && marks.main, i)"
-      >{{ n }}</span>
+        @click="onPick(n)"
+      >{{ n }}</component>
       <template v-if="(numbers.special || []).length">
         <span class="plus">+</span>
-        <span
+        <component
+          :is="interactive ? 'button' : 'span'"
           v-for="(n, i) in numbers.special"
           :key="'s' + i"
           class="ball"
-          :class="[specialClass, size, markClass(marks && marks.special, i)]"
+          :class="[specialClass, size, markClass(marks && marks.special, i), interactive ? 'pick' : '']"
+          :type="interactive ? 'button' : undefined"
           :title="markTitle(marks && marks.special, i)"
-        >{{ n }}</span>
+          @click="onPick(n)"
+        >{{ n }}</component>
       </template>
     </template>
   </div>
@@ -43,7 +52,15 @@ const props = defineProps({
   type: { type: String, default: 'ssq' },
   size: { type: String, default: '' },
   marks: { type: Object, default: null },
+  interactive: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['pick'])
+
+function onPick(n) {
+  if (!props.interactive) return
+  emit('pick', n)
+}
 
 const POS_LABELS = {
   fc3d: ['百', '十', '个'],

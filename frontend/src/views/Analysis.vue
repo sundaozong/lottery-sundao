@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴</p>
       </div>
     </div>
 
@@ -101,6 +101,178 @@
               <div class="text-xs text-muted">主号 {{ row.main_shared }}<template v-if="showSpecialShare"> · 特别 {{ row.special_shared }}</template></div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <div class="section-head">
+        <span>号码结伴</span>
+        <span class="sub">主号共现 · 近 {{ affinityWindow }} 期 · 仅供娱乐</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ affinity?.disclaimer || '号码结伴只看近期开奖里哪些号码一起出现，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">{{ affinityDigit ? '看某个数字' : '看某个号' }}</label>
+            <input
+              v-model="affinitySeed"
+              class="form-input mono"
+              :placeholder="affinityDigit ? '如 7' : '如 07'"
+              @keydown.enter="loadAffinity"
+            />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-primary" type="button" :disabled="affinityLoading" @click="loadAffinity">
+            <AppIcon v-if="affinityLoading" name="sync" :size="14" class="spin" />
+            {{ affinityLoading ? '统计中…' : '查看结伴' }}
+          </button>
+          <button
+            v-if="affinitySeed.trim()"
+            class="btn btn-ghost"
+            type="button"
+            :disabled="affinityLoading"
+            @click="clearAffinitySeed"
+          >看整体</button>
+        </div>
+        <p class="form-hint">{{ affinityHint }}</p>
+        <p v-if="affinityError" class="bet-error">{{ affinityError }}</p>
+        <div v-if="affinityLoading && !affinity" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计结伴…
+        </div>
+        <div v-else-if="affinity" class="affinity-list">
+          <p class="text-xs text-muted">
+            样本 {{ affinity.sample_size }} 期
+            <template v-if="affinity.seed"> · 正在看 {{ affinity.seed }}</template>
+            <template v-if="affinity.mode === 'digit'"> · 不同位置</template>
+          </p>
+          <div v-if="!affinity.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有主号样本后，这里会列出经常一起出现的号码</div>
+          </div>
+          <template v-else>
+            <div v-if="affinity.seed" class="affinity-block">
+              <div class="card-title">{{ affinityDigit ? '这个数字的结伴' : '这个号的结伴' }}
+                <span class="sub">出现时对方也在</span>
+              </div>
+              <div v-for="group in affinity.companions" :key="affinityKey(group)" class="affinity-group">
+                <div v-if="!group.appearances" class="empty">
+                  <div class="empty-title">样本里没有这个号</div>
+                  <div class="empty-desc">换一个号码，或看看下面经常一起出现的组合</div>
+                </div>
+                <template v-else>
+                  <div class="affinity-side affinity-anchor">
+                    <span v-if="group.position_label" class="pos-label">{{ group.position_label }}</span>
+                    <NumberBalls
+                      interactive
+                      :numbers="{ main: [group.n] }"
+                      :type="type"
+                      size="sm"
+                      @pick="pickAffinitySeed"
+                    />
+                    <span class="text-xs text-muted">出现 {{ group.appearances }} 次</span>
+                  </div>
+                  <div v-if="!group.companions.length" class="text-xs text-muted">没有其他号码和它一起出现</div>
+                  <div v-for="item in group.companions" :key="affinityKey(item)" class="affinity-companion">
+                    <div class="affinity-side">
+                      <span v-if="item.position_label" class="pos-label">{{ item.position_label }}</span>
+                      <NumberBalls
+                        interactive
+                        :numbers="{ main: [item.n] }"
+                        :type="type"
+                        size="sm"
+                        @pick="pickAffinitySeed"
+                      />
+                    </div>
+                    <div class="affinity-note" title="这个号出现的期里，对方也出现的比例">{{ item.count }} 次 · 同行 {{ affinityRate(item.rate) }}</div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div v-else-if="affinityGroups.length" class="affinity-block">
+              <div class="card-title">热号结伴 <span class="sub">出现时对方也在 · 点号码可只看它</span></div>
+              <div v-for="group in affinityGroups" :key="affinityKey(group)">
+                <div class="affinity-side affinity-anchor">
+                  <span v-if="group.position_label" class="pos-label">{{ group.position_label }}</span>
+                  <NumberBalls
+                    interactive
+                    :numbers="{ main: [group.n] }"
+                    :type="type"
+                    size="sm"
+                    @pick="pickAffinitySeed"
+                  />
+                  <span class="text-xs text-muted">出现 {{ group.appearances }} 次</span>
+                </div>
+                <div v-for="item in group.companions" :key="affinityKey(group) + '-' + affinityKey(item)" class="affinity-companion">
+                  <div class="affinity-side">
+                    <span v-if="item.position_label" class="pos-label">{{ item.position_label }}</span>
+                    <NumberBalls
+                      interactive
+                      :numbers="{ main: [item.n] }"
+                      :type="type"
+                      size="sm"
+                      @pick="pickAffinitySeed"
+                    />
+                  </div>
+                  <div class="affinity-note" title="这个号出现的期里，对方也出现的比例">{{ item.count }} 次 · 同行 {{ affinityRate(item.rate) }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="affinity-block">
+              <div class="card-title">常一起出现 <span class="sub">占全部样本</span></div>
+              <div v-if="!affinity.top_pairs.length" class="empty">
+                <div class="empty-title">还没有成对的号码</div>
+                <div class="empty-desc">样本里的主号太少，凑不成一对</div>
+              </div>
+              <div
+                v-for="pair in affinity.top_pairs"
+                :key="pairKey(pair)"
+                class="affinity-pair"
+              >
+                <div class="affinity-side">
+                  <span v-if="pair.label_a" class="pos-label">{{ pair.label_a }}</span>
+                  <NumberBalls
+                    interactive
+                    :numbers="{ main: [pair.a] }"
+                    :type="type"
+                    size="sm"
+                    @pick="pickAffinitySeed"
+                  />
+                  <span class="plus">+</span>
+                  <span v-if="pair.label_b" class="pos-label">{{ pair.label_b }}</span>
+                  <NumberBalls
+                    interactive
+                    :numbers="{ main: [pair.b] }"
+                    :type="type"
+                    size="sm"
+                    @pick="pickAffinitySeed"
+                  />
+                </div>
+                <div class="affinity-note" title="两号出现在同一期的次数，占样本期数">{{ pair.count }} 次 · 占 {{ affinityRate(pair.rate) }}</div>
+              </div>
+            </div>
+
+            <div v-if="affinity.special && affinity.special.top_pairs.length" class="affinity-block">
+              <div class="card-title">{{ affinity.special.label }} <span class="sub">和主号一起出现，不计入上面的结伴</span></div>
+              <div v-for="row in affinity.special.top_pairs.slice(0, 4)" :key="specialKey(row)" class="affinity-companion">
+                <div class="affinity-side">
+                  <span v-if="row.position_label" class="pos-label">{{ row.position_label }}</span>
+                  <NumberBalls
+                    :numbers="{ main: [row.main || row.n], special: [row.special] }"
+                    :type="type"
+                    size="sm"
+                  />
+                </div>
+                <div class="affinity-note">{{ row.count }} 次 · 占 {{ affinityRate(row.rate) }}</div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -302,8 +474,28 @@ const echoSpecial = ref('')
 const echoResult = ref(null)
 const echoError = ref('')
 const echoLoading = ref(false)
+const affinity = ref(null)
+const affinitySeed = ref('')
+const affinityError = ref('')
+const affinityLoading = ref(false)
+let affinityToken = 0
 
 const echoField = computed(() => ECHO_FIELDS[type.value] || ECHO_FIELDS.ssq)
+const affinityDigit = computed(() => echoField.value.digit)
+const affinityWindow = computed(() => Math.min(Math.max(periods.value, 50), 200))
+const affinityHint = computed(() => (
+  affinityDigit.value
+    ? '只看不同位置。点一个数字，看其他位置经常一起开出什么。'
+    : '主号不分先后。点一个球，看它开出时还经常带上谁。'
+))
+const affinityGroups = computed(() => {
+  const groups = affinity.value?.companions || []
+  if (affinity.value?.seed) return groups
+  return groups.slice(0, 4).map((group) => ({
+    ...group,
+    companions: (group.companions || []).slice(0, 3),
+  }))
+})
 const showSpecialShare = computed(() => Boolean(echoField.value.specialLabel))
 
 const displayFreq = computed(() => {
@@ -426,18 +618,70 @@ async function fillLatestEcho() {
   }
 }
 
+function affinityRate(rate) {
+  const value = Number(rate)
+  if (!Number.isFinite(value)) return '—'
+  return `${(value * 100).toFixed(1)}%`
+}
+
+function affinityKey(item) {
+  return `${item.position ?? ''}-${item.n}`
+}
+
+function pairKey(pair) {
+  return `${pair.pos_a ?? ''}-${pair.a}-${pair.pos_b ?? ''}-${pair.b}`
+}
+
+function specialKey(row) {
+  return `${row.position ?? ''}-${row.main || row.n}-${row.special}`
+}
+
+function pickAffinitySeed(n) {
+  affinitySeed.value = String(n ?? '')
+  loadAffinity()
+}
+
+function clearAffinitySeed() {
+  affinitySeed.value = ''
+  loadAffinity()
+}
+
+async function loadAffinity() {
+  const token = ++affinityToken
+  affinityLoading.value = true
+  affinityError.value = ''
+  const seed = affinitySeed.value.trim()
+  try {
+    const body = await api.affinity(type.value, { limit: affinityWindow.value, seed: seed || undefined })
+    if (token !== affinityToken) return
+    affinity.value = body
+    affinitySeed.value = body.seed || ''
+  } catch (e) {
+    if (token !== affinityToken) return
+    affinity.value = null
+    affinityError.value = e.message || '结伴加载失败'
+  } finally {
+    if (token === affinityToken) affinityLoading.value = false
+  }
+}
+
 function load() {
   shape.value = null
   echoResult.value = null
   echoError.value = ''
   echoMain.value = ''
   echoSpecial.value = ''
+  affinity.value = null
+  affinityError.value = ''
+  affinitySeed.value = ''
   loadDraws()
   loadAnalysis()
+  loadAffinity()
 }
 
 watch(periods, () => {
   loadAnalysis()
+  loadAffinity()
 })
 
 watch(() => route.query.type, (next) => {
