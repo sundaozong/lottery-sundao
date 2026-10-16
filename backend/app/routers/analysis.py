@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas import EchoIn
+from ..schemas import CollisionIn, EchoIn
 from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
+from ..services.collision import collide, collide_records
 from ..services.echo import find_echoes
 from ..services.shape import shape_stats
 from ..services.seed import ensure_seed
@@ -35,6 +36,18 @@ def get_shape(
     ensure_seed(db)
     try:
         return shape_stats(db, normalize_type(lottery_type), limit=limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/{lottery_type}/collision")
+def post_collision(lottery_type: str, body: CollisionIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    try:
+        lottery = normalize_type(lottery_type)
+        if body.from_records:
+            return collide_records(db, lottery)
+        return collide(lottery, [item.model_dump() for item in body.tickets])
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

@@ -88,11 +88,21 @@ function positionFlags(i) {
 
 function markClass(flags, i) {
   if (!flags || flags[i] == null) return ''
-  return flags[i] ? 'hit' : 'miss'
+  if (flags[i] === true) return 'hit'
+  if (flags[i] === false) return 'miss'
+  const count = Number(flags[i])
+  if (!Number.isFinite(count) || count < 2) return ''
+  if (count >= 4) return 'crash crash-3'
+  if (count >= 3) return 'crash crash-2'
+  return 'crash crash-1'
 }
 
 function markTitle(flags, i) {
   if (!flags || flags[i] == null) return undefined
-  return flags[i] ? '命中' : '未中'
+  if (flags[i] === true) return '命中'
+  if (flags[i] === false) return '未中'
+  const count = Number(flags[i])
+  if (Number.isFinite(count) && count >= 2) return `撞了 ${count} 注`
+  return undefined
 }
 </script>

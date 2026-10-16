@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车</p>
       </div>
     </div>
 
@@ -277,6 +277,211 @@
       </div>
     </div>
 
+    <div class="mb-4">
+      <div class="section-head">
+        <span>号码撞车</span>
+        <span class="sub">{{ collisionField.digit ? '按位对照' : '号码集合对照' }} · 最多 20 注 · 仅供娱乐</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ collisionResult?.disclaimer || '预测/分析仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-primary" type="button" :disabled="collisionLoading" @click="runCollision(false)">
+            <AppIcon v-if="collisionLoading" name="sync" :size="14" class="spin" />
+            {{ collisionLoading ? '对照中…' : '看撞车' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="collisionLoading" @click="runCollision(true)">用购彩记录</button>
+          <button class="btn btn-ghost" type="button" @click="toggleCollisionPad">{{ collisionUsePad ? '改用输入' : '点选录入' }}</button>
+        </div>
+        <p class="form-hint">
+          {{ collisionField.digit ? '同一位置数字相同才算撞号，顺序不能打乱。' : '主号看选重了几个，特别号单独算，先后顺序不影响。' }}
+        </p>
+
+        <div v-for="(ticket, index) in collisionTickets" :key="ticket.key" class="collision-ticket">
+          <div class="collision-ticket-head">
+            <span>第 {{ index + 1 }} 注</span>
+            <button
+              v-if="collisionTickets.length > 2"
+              class="text-btn"
+              type="button"
+              @click="removeCollisionTicket(index)"
+            >删除</button>
+          </div>
+          <template v-if="collisionUsePad && collisionField.digit">
+            <div class="pos-inputs">
+              <div v-for="(label, pos) in collisionField.positions" :key="label" class="form-group">
+                <label class="form-label">{{ label }}</label>
+                <NumberPad
+                  :from="0"
+                  :to="collisionField.hi"
+                  :pad="1"
+                  :color="type === 'qxc' ? 'purple' : 'green'"
+                  :max="1"
+                  :selected="ticket.digits[pos] ? [ticket.digits[pos]] : []"
+                  @update:selected="setCollisionDigit(ticket, pos, $event)"
+                />
+              </div>
+              <div v-if="collisionField.special" class="form-group">
+                <label class="form-label">{{ collisionField.special.label }}</label>
+                <NumberPad
+                  :from="collisionField.special.from"
+                  :to="collisionField.special.to"
+                  :pad="1"
+                  :color="collisionField.special.color"
+                  :max="1"
+                  :selected="splitNums(ticket.specialText).slice(0, 1)"
+                  @update:selected="ticket.specialText = ($event[0] || '')"
+                />
+              </div>
+            </div>
+          </template>
+          <template v-else-if="collisionUsePad">
+            <div class="form-group">
+              <label class="form-label">{{ collisionField.main.label }}</label>
+              <NumberPad
+                :from="collisionField.main.from"
+                :to="collisionField.main.to"
+                :pad="collisionField.main.pad"
+                :color="collisionField.main.color"
+                :max="collisionField.main.max"
+                :selected="splitNums(ticket.mainText)"
+                @update:selected="ticket.mainText = $event.join(' ')"
+              />
+            </div>
+            <div v-if="collisionField.special" class="form-group">
+              <label class="form-label">{{ collisionField.special.label }}</label>
+              <NumberPad
+                :from="collisionField.special.from"
+                :to="collisionField.special.to"
+                :pad="collisionField.special.pad"
+                :color="collisionField.special.color"
+                :max="collisionField.special.max"
+                :selected="splitNums(ticket.specialText)"
+                @update:selected="ticket.specialText = $event.join(' ')"
+              />
+            </div>
+          </template>
+          <div v-else class="form-row">
+            <div class="form-group">
+              <label class="form-label">{{ collisionField.digit ? '号码' : collisionField.main.label }}</label>
+              <input v-model="ticket.mainText" class="form-input mono" :placeholder="echoField.main" />
+            </div>
+            <div v-if="collisionField.special || echoField.specialLabel" class="form-group">
+              <label class="form-label">{{ collisionField.special?.label || echoField.specialLabel }}</label>
+              <input v-model="ticket.specialText" class="form-input mono" :placeholder="echoField.special" />
+            </div>
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="collisionTickets.length >= 20" @click="addCollisionTicket">再加一注</button>
+        </div>
+        <div class="form-group collision-paste">
+          <label class="form-label">粘贴多注 <span class="sub">一行一注，特别号用 + 隔开</span></label>
+          <textarea v-model="collisionPaste" class="form-textarea mono" rows="3" placeholder="01 02 03 04 05 06 + 07" />
+          <button class="btn btn-ghost" type="button" :disabled="collisionLoading" @click="applyCollisionPaste">解析粘贴</button>
+        </div>
+        <p v-if="collisionError" class="bet-error">{{ collisionError }}</p>
+
+        <div v-if="collisionResult" class="collision-list">
+          <p class="text-xs text-muted">
+            {{ collisionScope(collisionResult) }}
+            <template v-if="collisionResult.ticket_count"> · {{ collisionResult.summary }}</template>
+          </p>
+          <div v-if="collisionResult.message" class="empty">
+            <div class="empty-title">记录不够</div>
+            <div class="empty-desc">{{ collisionResult.message }}</div>
+          </div>
+          <template v-else>
+            <div class="collision-coverage">
+              <div>
+                <div class="stat-label">主号覆盖</div>
+                <div class="stat-value">{{ collisionResult.unique_coverage.covered }} / {{ collisionResult.unique_coverage.pool }}</div>
+              </div>
+              <div>
+                <div class="stat-label">撞号</div>
+                <div class="stat-value">{{ collisionMainHits.length }}</div>
+              </div>
+            </div>
+            <div class="card-title">撞号 <span class="sub">出现在 2 注及以上，圈越重重复越多</span></div>
+            <div v-if="!collisionMainHits.length && !collisionSpecialHits.length" class="empty">
+              <div class="empty-title">没有撞号</div>
+              <div class="empty-desc">这几注的号码是拉开的</div>
+            </div>
+            <template v-else-if="collisionResult.mode === 'digit'">
+              <div v-for="hit in collisionMainHits" :key="hit.position + '-' + hit.n" class="collision-hit">
+                <span class="pos-label">{{ hit.position_label }}</span>
+                <NumberBalls :numbers="{ main: [hit.n] }" :type="type" :marks="{ main: [hit.count] }" size="sm" />
+                <span class="text-xs text-muted">{{ hit.count }} 注</span>
+              </div>
+            </template>
+            <NumberBalls
+              v-else
+              :numbers="{ main: collisionMainHits.map((hit) => hit.n), special: collisionSpecialHits.map((hit) => hit.n) }"
+              :type="type"
+              :marks="{ main: collisionMainHits.map((hit) => hit.count), special: collisionSpecialHits.map((hit) => hit.count) }"
+              size="sm"
+            />
+            <div v-if="collisionResult.mode === 'digit' && collisionSpecialHits.length" class="mt-3">
+              <div class="card-title">{{ collisionField.special?.label || '特别号' }} <span class="sub">不计入上面的同位撞号</span></div>
+              <div v-for="hit in collisionSpecialHits" :key="'s' + hit.n" class="collision-hit">
+                <span class="ball sm crash" :class="[ballClass(type, 'special'), hit.count >= 4 ? 'crash-3' : hit.count >= 3 ? 'crash-2' : 'crash-1']">{{ hit.n }}</span>
+                <span class="text-xs text-muted">{{ hit.count }} 注</span>
+              </div>
+            </div>
+
+            <div class="card-title mt-3">各注</div>
+            <div v-for="ticket in collisionResult.tickets" :key="ticket.index" class="echo-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>第 {{ ticket.index }} 注</span>
+                  <span v-if="ticket.issue" class="mono">{{ ticket.issue }}</span>
+                </div>
+                <NumberBalls :numbers="collisionNumbers(ticket)" :type="type" :marks="collisionMarks(ticket)" size="sm" />
+              </div>
+            </div>
+
+            <div class="card-title mt-3">两两对照</div>
+            <div class="table-wrap table-wrap-plain">
+              <table>
+                <thead><tr><th>两注</th><th>撞上的号</th><th>说明</th></tr></thead>
+                <tbody>
+                  <tr v-for="pair in collisionResult.pairs" :key="pair.left + '-' + pair.right">
+                    <td class="mono">{{ pair.left }} × {{ pair.right }}</td>
+                    <td>
+                      <span v-if="!pair.overlap_count && !pair.special_overlap_count" class="text-xs text-muted">没有撞号</span>
+                      <template v-else>
+                        <span v-for="(n, i) in pair.overlapping.main" :key="'m' + i" class="collision-hit">
+                          <span v-if="pair.overlapping.positions?.length" class="pos-label">{{ collisionPosLabel(pair.overlapping.positions[i]) }}</span>
+                          <NumberBalls :numbers="{ main: [n] }" :type="type" :marks="{ main: [Math.max(pair.overlap_count, 2)] }" size="sm" />
+                        </span>
+                        <span v-for="n in pair.overlapping.special" :key="'s' + n" class="collision-hit">
+                          <span class="pos-label">{{ collisionField.special?.label || '特别' }}</span>
+                          <span class="ball sm crash crash-1" :class="ballClass(type, 'special')">{{ n }}</span>
+                        </span>
+                      </template>
+                    </td>
+                    <td>{{ pair.waste_hint }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="collisionResult.mode === 'set'" class="mt-3">
+              <div class="card-title">没覆盖到的号 <span class="sub">主号池里这几注都没选{{ collisionResult.holes.length >= 24 ? '，这里最多 24 个' : '' }}</span></div>
+              <div v-if="!collisionResult.holes.length" class="empty">
+                <div class="empty-title">主号都覆盖到了</div>
+              </div>
+              <div v-else class="balls">
+                <span v-for="n in collisionResult.holes" :key="n" class="ball ghost sm">{{ n }}</span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -447,6 +652,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
+import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
 import AppIcon from '../components/AppIcon.vue'
 
@@ -480,7 +686,60 @@ const affinityError = ref('')
 const affinityLoading = ref(false)
 let affinityToken = 0
 
+const COLLISION_FIELDS = {
+  ssq: {
+    digit: false,
+    main: { from: 1, to: 33, pad: 2, max: 20, color: 'red', label: '红球' },
+    special: { from: 1, to: 16, pad: 2, max: 16, color: 'blue', label: '蓝球' },
+  },
+  dlt: {
+    digit: false,
+    main: { from: 1, to: 35, pad: 2, max: 20, color: 'red', label: '前区' },
+    special: { from: 1, to: 12, pad: 2, max: 12, color: 'blue', label: '后区' },
+  },
+  qlc: {
+    digit: false,
+    main: { from: 1, to: 30, pad: 2, max: 16, color: 'red', label: '基本号' },
+    special: { from: 1, to: 30, pad: 2, max: 1, color: 'blue', label: '特别号' },
+  },
+  kl8: {
+    digit: false,
+    main: { from: 1, to: 80, pad: 2, max: 20, color: 'orange', label: '号码' },
+    special: null,
+  },
+  fc3d: { digit: true, positions: ['百', '十', '个'], hi: 9, special: null },
+  pl3: { digit: true, positions: ['百', '十', '个'], hi: 9, special: null },
+  pl5: { digit: true, positions: ['万', '千', '百', '十', '个'], hi: 9, special: null },
+  qxc: {
+    digit: true,
+    positions: ['1', '2', '3', '4', '5', '6'],
+    hi: 9,
+    special: { from: 0, to: 14, pad: 1, max: 1, color: 'orange', label: '特别号' },
+  },
+}
+
+let collisionKey = 0
+function blankCollisionTicket() {
+  collisionKey += 1
+  const field = COLLISION_FIELDS[type.value] || COLLISION_FIELDS.ssq
+  return {
+    key: collisionKey,
+    mainText: '',
+    specialText: '',
+    digits: field.digit ? field.positions.map(() => '') : [],
+  }
+}
+
 const echoField = computed(() => ECHO_FIELDS[type.value] || ECHO_FIELDS.ssq)
+const collisionField = computed(() => COLLISION_FIELDS[type.value] || COLLISION_FIELDS.ssq)
+const collisionTickets = ref([blankCollisionTicket(), blankCollisionTicket()])
+const collisionPaste = ref('')
+const collisionResult = ref(null)
+const collisionError = ref('')
+const collisionLoading = ref(false)
+const collisionUsePad = ref(false)
+const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
+const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
 const affinityWindow = computed(() => Math.min(Math.max(periods.value, 50), 200))
 const affinityHint = computed(() => (
@@ -665,6 +924,135 @@ async function loadAffinity() {
   }
 }
 
+function fillCollisionDigits(ticket) {
+  const field = collisionField.value
+  if (!field.digit) {
+    ticket.digits = []
+    return
+  }
+  const parts = splitNums(ticket.mainText)
+  ticket.digits = field.positions.map((_, index) => parts[index] || '')
+}
+
+function toggleCollisionPad() {
+  if (!collisionUsePad.value) {
+    collisionTickets.value.forEach(fillCollisionDigits)
+  } else if (collisionField.value.digit) {
+    collisionTickets.value.forEach((ticket) => {
+      ticket.mainText = (ticket.digits || []).join(' ').trim()
+    })
+  }
+  collisionUsePad.value = !collisionUsePad.value
+}
+
+function setCollisionDigit(ticket, index, selected) {
+  if (!ticket.digits.length) fillCollisionDigits(ticket)
+  ticket.digits[index] = selected[0] || ''
+  ticket.mainText = ticket.digits.join(' ').trim()
+}
+
+function addCollisionTicket() {
+  if (collisionTickets.value.length >= 20) return
+  collisionTickets.value.push(blankCollisionTicket())
+}
+
+function removeCollisionTicket(index) {
+  if (collisionTickets.value.length <= 2) return
+  collisionTickets.value.splice(index, 1)
+}
+
+function collisionPayload(ticket) {
+  const field = collisionField.value
+  const main = field.digit && collisionUsePad.value
+    ? (ticket.digits || []).filter((item) => item !== '')
+    : splitNums(ticket.mainText)
+  const special = field.special ? splitNums(ticket.specialText) : []
+  return { main, special }
+}
+
+function collisionPosLabel(index) {
+  return collisionField.value.positions?.[index] || String(index + 1)
+}
+
+function collisionScope(result) {
+  if (result?.message) return '购彩记录'
+  if (result?.source === 'records' && result.record_scope === 'open') return '未开奖的购彩记录'
+  if (result?.source === 'records') return '最近的购彩记录'
+  return '手填号码'
+}
+
+function collisionNumbers(ticket) {
+  if (collisionResult.value?.mode !== 'digit') {
+    return { main: ticket.main, special: ticket.special }
+  }
+  const positions = (ticket.main || []).map((n) => [n])
+  if ((ticket.special || []).length) positions.push([ticket.special[0]])
+  return { positions }
+}
+
+function collisionMarks(ticket) {
+  const hits = collisionResult.value?.number_hits || []
+  if (collisionResult.value?.mode === 'digit') {
+    const positions = (ticket.main || []).map((n, index) => {
+      const hit = hits.find((item) => item.kind === 'main' && item.position === index && item.n === String(n))
+      return [hit && hit.count >= 2 ? hit.count : null]
+    })
+    if ((ticket.special || []).length) {
+      const hit = hits.find((item) => item.kind === 'special' && item.n === String(ticket.special[0]))
+      positions.push([hit && hit.count >= 2 ? hit.count : null])
+    }
+    return { positions }
+  }
+  const mainCount = new Map(hits.filter((item) => item.kind === 'main').map((item) => [item.n, item.count]))
+  const specialCount = new Map(hits.filter((item) => item.kind === 'special').map((item) => [item.n, item.count]))
+  return {
+    main: (ticket.main || []).map((n) => ((mainCount.get(String(n)) || 0) >= 2 ? mainCount.get(String(n)) : null)),
+    special: (ticket.special || []).map((n) => ((specialCount.get(String(n)) || 0) >= 2 ? specialCount.get(String(n)) : null)),
+  }
+}
+
+async function runCollision(fromRecords) {
+  collisionLoading.value = true
+  collisionError.value = ''
+  try {
+    const body = fromRecords
+      ? { from_records: true, tickets: [] }
+      : { from_records: false, tickets: collisionTickets.value.map(collisionPayload) }
+    collisionResult.value = await api.collision(type.value, body)
+  } catch (e) {
+    collisionResult.value = null
+    collisionError.value = e.message || '撞车对照失败'
+  } finally {
+    collisionLoading.value = false
+  }
+}
+
+async function applyCollisionPaste() {
+  const lines = collisionPaste.value.split(/\n/).map((line) => line.trim()).filter(Boolean)
+  if (lines.length < 2) {
+    collisionError.value = '一行一注，至少贴两行'
+    collisionResult.value = null
+    return
+  }
+  collisionTickets.value = lines.slice(0, 20).map((line) => {
+    const ticket = blankCollisionTicket()
+    const parts = line.split(/\s*[+|｜]\s*/)
+    ticket.mainText = (parts[0] || '').trim()
+    ticket.specialText = (parts[1] || '').trim()
+    fillCollisionDigits(ticket)
+    return ticket
+  })
+  await runCollision(false)
+}
+
+function resetCollision() {
+  collisionResult.value = null
+  collisionError.value = ''
+  collisionPaste.value = ''
+  collisionUsePad.value = false
+  collisionTickets.value = [blankCollisionTicket(), blankCollisionTicket()]
+}
+
 function load() {
   shape.value = null
   echoResult.value = null
@@ -674,6 +1062,7 @@ function load() {
   affinity.value = null
   affinityError.value = ''
   affinitySeed.value = ''
+  resetCollision()
   loadDraws()
   loadAnalysis()
   loadAffinity()

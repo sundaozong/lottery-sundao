@@ -27,6 +27,7 @@ export const api = {
     return request(`/api/analysis/${type}/affinity?${params}`)
   },
   echo: (type, body) => request(`/api/analysis/${type}/echo`, { method: 'POST', body: JSON.stringify(body) }),
+  collision: (type, body) => request(`/api/analysis/${type}/collision`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
