@@ -1,10 +1,13 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import PurchaseRecord
 from ..schemas import RecordIn, RecordUpdate
 from ..lotteries import LOTTERIES, load_bet
+from ..services.ledger import monthly_summary, parse_day, records_csv, rhythm
 from ..services.prize import canonical_bet, play_name
 from ..services.seed import ensure_seed
 
@@ -43,6 +46,44 @@ def list_records(db: Session = Depends(get_db)):
             "net": round(total_prize - total_cost, 2),
         },
     }
+
+
+def _all_rows(db: Session) -> list[PurchaseRecord]:
+    return db.query(PurchaseRecord).order_by(PurchaseRecord.id.desc()).all()
+
+
+@router.get("/monthly")
+def records_monthly(db: Session = Depends(get_db)):
+    ensure_seed(db)
+    return monthly_summary(_all_rows(db))
+
+
+@router.get("/rhythm")
+def records_rhythm(
+    on: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    ensure_seed(db)
+    today = date.today()
+    if on is not None:
+        parsed = parse_day(on)
+        if parsed is None:
+            raise HTTPException(400, "日期无效")
+        today = parsed
+    return rhythm(_all_rows(db), today)
+
+
+@router.get("/export")
+def export_records(db: Session = Depends(get_db)):
+    ensure_seed(db)
+    payload = records_csv(_all_rows(db)).encode("utf-8-sig")
+    return Response(
+        content=payload,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=records.csv; filename*=UTF-8''%E8%B4%AD%E4%B9%B0%E8%AE%B0%E5%BD%95.csv"
+        },
+    )
 
 
 def _store_numbers(lottery_type: str, numbers) -> str:
