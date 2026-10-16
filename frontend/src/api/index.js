@@ -21,6 +21,11 @@ export const api = {
     request(`/api/draws/crawl${type ? `?lottery_type=${type}` : ''}`, { method: 'POST' }),
   analysis: (type, limit = 50) => request(`/api/analysis/${type}?limit=${limit}`),
   shape: (type, limit = 50) => request(`/api/analysis/${type}/shape?limit=${limit}`),
+  affinity: (type, { limit = 50, seed } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (seed) params.set('seed', seed)
+    return request(`/api/analysis/${type}/affinity?${params}`)
+  },
   echo: (type, body) => request(`/api/analysis/${type}/echo`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),

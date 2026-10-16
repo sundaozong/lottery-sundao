@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..schemas import EchoIn
+from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
 from ..services.echo import find_echoes
 from ..services.shape import shape_stats
@@ -9,6 +10,20 @@ from ..services.seed import ensure_seed
 from ..lotteries import normalize_type
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
+
+
+@router.get("/{lottery_type}/affinity")
+def get_affinity(
+    lottery_type: str,
+    limit: int = Query(50, ge=5, le=200),
+    seed: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    ensure_seed(db)
+    try:
+        return affinity_stats(db, normalize_type(lottery_type), limit=limit, seed=seed)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/{lottery_type}/shape")
