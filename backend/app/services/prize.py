@@ -115,7 +115,7 @@ def _row(condition: str, level: str, amount: float, floating: bool) -> dict:
     }
 
 
-def _balls(values: Any, width: int, lo: int, hi: int, label: str) -> list[str]:
+def _balls(values: Any, width: int, lo: int, hi: int, label: str, allow_dup: bool = False) -> list[str]:
     if values is None:
         values = []
     if isinstance(values, str):
@@ -130,7 +130,7 @@ def _balls(values: Any, width: int, lo: int, hi: int, label: str) -> list[str]:
         if number < lo or number > hi:
             raise ValueError(f"{label}超出 {lo}–{hi}：{text}")
         key = str(number).zfill(width) if width > 1 else str(number)
-        if key in seen:
+        if key in seen and not allow_dup:
             raise ValueError(f"{label}重复：{key}")
         seen.add(key)
         out.append(key)
@@ -163,9 +163,13 @@ def play_name(lottery_type: str, bet: dict, bets: int = 1) -> str:
         pick = int(bet.get("pick") or 10)
         kind = "复式" if bets > 1 else "单式"
         return f"选{PICK_CN.get(pick, pick)}{kind}"
+    if not play:
+        if t in ("fc3d", "pl3", "pl5"):
+            return "直选"
+        return "单式"
     if play in ("single", "compound") and t in ("ssq", "dlt", "qxc"):
         return "复式" if play == "compound" or bets > 1 else "单式"
-    return PLAY_NAMES.get(play, "单式" if not play else play)
+    return PLAY_NAMES.get(play, play)
 
 
 def _table_for(t: str, pick: Optional[int] = None) -> list[dict]:
@@ -416,7 +420,7 @@ def _norm_digit3(t, play, raw, multiple) -> dict:
         play = "direct"
     if play in ("direct", "direct_compound"):
         return _norm_positional(t, play, raw, multiple, 3, 0, 9, "福彩3D" if t == "fc3d" else "排列三")
-    nums = _balls(raw.get("main"), 1, 0, 9, "号码")
+    nums = _balls(raw.get("main"), 1, 0, 9, "号码", allow_dup=(play == "group3"))
     distinct = list(dict.fromkeys(nums))
     if play == "group3":
         if len(nums) != 3 or len(set(nums)) != 2:
@@ -459,12 +463,12 @@ def _norm_kl8(raw, pick_n, multiple) -> dict:
     return {"play": "pick", "main": nums, "special": [], "positions": [], "pick": pick, "multiple": multiple}
 
 
-def _draw_pair(draw_numbers: Any, width: int, lo: int, hi: int, main_label: str, special_label: str, special_lo: int, special_hi: int) -> tuple[list[str], list[str]]:
+def _draw_pair(draw_numbers: Any, width: int, lo: int, hi: int, main_label: str, special_label: str, special_lo: int, special_hi: int, allow_dup: bool = False) -> tuple[list[str], list[str]]:
     parsed = parse_numbers(draw_numbers or {})
     if not parsed["main"] and not parsed["special"]:
         return [], []
-    main = _balls(parsed["main"], width, lo, hi, "开奖" + main_label)
-    special = _balls(parsed["special"], width, special_lo, special_hi, "开奖" + special_label)
+    main = _balls(parsed["main"], width, lo, hi, "开奖" + main_label, allow_dup=allow_dup)
+    special = _balls(parsed["special"], width, special_lo, special_hi, "开奖" + special_label, allow_dup=allow_dup)
     return main, special
 
 
@@ -532,12 +536,12 @@ def _score(bet: dict, draw_numbers: Any) -> tuple[int, list[dict], int, int, Opt
             raise ValueError("快乐八开奖号码不完整")
         return _score_kl8(bet, draw_main)
     if t in ("fc3d", "pl3"):
-        draw_main, _ = _draw_pair(draw_numbers, 1, 0, 9, "号码", "号码", 0, 9)
+        draw_main, _ = _draw_pair(draw_numbers, 1, 0, 9, "号码", "号码", 0, 9, allow_dup=True)
         if len(draw_main) < 3:
             raise ValueError("开奖号码需要 3 位")
         return _score_digit3(bet, draw_main[:3])
     if t == "pl5":
-        draw_main, _ = _draw_pair(draw_numbers, 1, 0, 9, "号码", "号码", 0, 9)
+        draw_main, _ = _draw_pair(draw_numbers, 1, 0, 9, "号码", "号码", 0, 9, allow_dup=True)
         if len(draw_main) < 5:
             raise ValueError("排列五开奖号码需要 5 位")
         return _score_direct(bet, draw_main[:5], 100_000, "5位按位全中", "直选")
@@ -685,7 +689,7 @@ def _score_qxc(bet, draw_numbers):
     if parsed["main"] and not parsed.get("special") and len(parsed["main"]) >= 7:
         draw_pos = [str(int(x)) for x in parsed["main"][:7]]
     else:
-        front = _balls(parsed["main"], 1, 0, 9, "开奖前区")
+        front = _balls(parsed["main"], 1, 0, 9, "开奖前区", allow_dup=True)
         special = _balls(parsed["special"], 1, 0, 14, "开奖特别号")
         if len(front) < 6 or len(special) < 1:
             raise ValueError("七星彩开奖号码不完整")

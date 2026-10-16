@@ -40,6 +40,94 @@
   }
 }
 
+.bet-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: 22px;
+  align-items: start;
+}
+.pos-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 18px;
+  margin-bottom: 6px;
+}
+.num-pad {
+  display: grid;
+  gap: 4px;
+}
+.num-cell {
+  position: relative;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  cursor: pointer;
+  padding: 0;
+}
+.num-cell:hover { border-color: var(--border-strong); color: var(--text); }
+.num-cell.on { color: #f0f0f2; border-color: transparent; }
+.num-cell.on.red { background: var(--ball-red); }
+.num-cell.on.blue { background: var(--ball-blue); }
+.num-cell.on.green { background: var(--ball-green); }
+.num-cell.on.orange { background: var(--ball-orange); }
+.num-cell.on.purple { background: var(--ball-purple); }
+.num-cell.locked { opacity: 0.35; cursor: default; }
+.num-cell i {
+  position: absolute;
+  top: -3px;
+  right: -2px;
+  min-width: 12px;
+  height: 12px;
+  border-radius: 99px;
+  background: var(--bg-deep);
+  color: var(--text);
+  font-style: normal;
+  font-size: 0.58rem;
+  line-height: 12px;
+}
+.pos-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 8px;
+}
+.pos-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.stake-box { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.stake-line { font-size: 0.84rem; }
+.breakdown {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.bet-error { color: var(--danger); font-size: 0.75rem; margin-top: 8px; }
+.prize-table td, .prize-table th { padding: 6px 8px; }
+.prize-table tr.hit td { background: rgba(125, 143, 168, 0.14); color: var(--text); }
+.text-btn {
+  border: 0;
+  background: transparent;
+  color: var(--accent-soft);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 0 0 6px;
+}
+@media (max-width: 900px) {
+  .bet-layout { grid-template-columns: 1fr; }
+}
+
 .router-link-active.nav-item {
   background: var(--accent-dim);
   color: var(--accent-soft);
@@ -110,7 +198,7 @@
 }
 
 .prize-hits {
-  margin-bottom: 18px;
+  margin: 14px 0 16px;
   padding: 14px 16px;
   border-radius: 10px;
   background: rgba(91, 184, 150, 0.1);
@@ -123,7 +211,7 @@
 .prize-hits-label {
   margin-bottom: 10px;
   font-size: 0.78rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.04em;
   color: #7dceb0;
 }
@@ -175,3 +263,151 @@
   .predict-layout { grid-template-columns: 1fr; }
   .predict-recent { position: static; max-height: none; }
 }
+
+
+.trend-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.chip-row.compact { gap: 6px; }
+.chip-row.compact .chip { padding: 4px 10px; font-size: 12px; }
+.trend-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.trend-omit-sample {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #6b7280;
+}
+.trend-scroll {
+  overflow: auto;
+  max-height: min(70vh, 820px);
+  width: 100%;
+  border: 1px solid var(--border, #22242c);
+  border-radius: 10px;
+}
+.trend {
+  width: 100%;
+}
+.trend-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+  font-size: 11px;
+}
+.trend-table th,
+.trend-table td {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-right: 1px solid rgba(255,255,255,0.03);
+  text-align: center;
+  padding: 2px 1px;
+  height: 26px;
+  min-width: 22px;
+}
+.trend-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #12141a;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.trend-table thead tr:nth-child(2) th {
+  top: 26px;
+}
+.trend-table .sticky-col,
+.trend-table .sticky-col-2 {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #0e1016;
+  min-width: 64px;
+  padding: 0 8px;
+  text-align: left;
+}
+.trend-table .sticky-col-2 { left: 64px; min-width: 48px; z-index: 2; }
+.trend-table thead .sticky-col,
+.trend-table thead .sticky-col-2 { z-index: 4; background: #12141a; }
+.trend-table .num-col { width: 22px; }
+.trend-table .sep-col {
+  width: 8px;
+  min-width: 8px;
+  background: rgba(255,255,255,0.03);
+  border-right: none;
+}
+.trend-table .omit {
+  color: #4b5563;
+  font-variant-numeric: tabular-nums;
+}
+.trend-table .muted { color: var(--text-muted); }
+.trend-table .zone-0 { background: rgba(220, 80, 80, 0.04); }
+.trend-table .zone-1 { background: rgba(125, 143, 168, 0.05); }
+.trend-table .zone-2 { background: rgba(91, 184, 150, 0.04); }
+.trend-table .zone-3 { background: rgba(240, 193, 75, 0.04); }
+.trend-table .special-head { color: #7da0c8; }
+.trend-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: #12141a;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.trend-table tfoot .foot { color: #9aa3b5; }
+.trend-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
+.trend-table .ball.xs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+
+.trend-canvas-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 100%;
+}
+.trend-blue-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.trend-table .zone-row .zone-head {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #c8d0dc;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.trend-table .special-zone {
+  color: #8eb6e8;
+  font-size: 11px;
+}
+.trend-table .stat-head,
+.trend-table .stat-cell {
+  min-width: 44px;
+  padding: 0 6px;
+  white-space: nowrap;
+  background: rgba(255,255,255,0.02);
+}
+.trend-table .tag.odd { color: #e8a87c; }
+.trend-table .tag.even { color: #7dceb0; }
+.trend-table .blue-hit { position: relative; z-index: 2; }
+.trend-table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+.trend-table tbody tr:nth-child(even) .sticky-col,
+.trend-table tbody tr:nth-child(even) .sticky-col-2 { background: #10121a; }

@@ -46,7 +46,7 @@ def latest_draws(db: Session = Depends(get_db)):
 @router.get("")
 def list_draws(
     lottery_type: Optional[str] = None,
-    limit: int = Query(30, ge=1, le=200),
+    limit: int = Query(30, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
     ensure_seed(db)

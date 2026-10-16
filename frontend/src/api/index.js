@@ -25,6 +25,7 @@ export const api = {
   createRecord: (body) => request('/api/records', { method: 'POST', body: JSON.stringify(body) }),
   updateRecord: (id, body) => request(`/api/records/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteRecord: (id) => request(`/api/records/${id}`, { method: 'DELETE' }),
+  prizeRules: () => request('/api/prize/rules'),
   prizeCalc: (body) => request('/api/prize/calc', { method: 'POST', body: JSON.stringify(body) }),
   settings: () => request('/api/settings'),
   saveSettings: (body) => request('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),

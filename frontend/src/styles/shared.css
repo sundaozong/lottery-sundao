@@ -210,8 +210,9 @@ a:hover { color: var(--text); }
 
 .main {
   padding: var(--space-6) var(--space-6);
-  max-width: 1180px;
+  max-width: none;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .page-header {
@@ -311,10 +312,20 @@ a:hover { color: var(--text); }
 .ball.lg { width: 30px; height: 30px; font-size: 0.8rem; }
 .ball.xl { width: 40px; height: 40px; font-size: 1rem; font-weight: 700; }
 .ball.hit {
-  outline: 2px solid #7dceb0;
-  outline-offset: 2px;
+  outline: 3px solid #f0c14b;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 2px rgba(240, 193, 75, 0.35), 0 0 18px rgba(240, 193, 75, 0.45);
+  transform: scale(1.12);
+  z-index: 2;
+  position: relative;
 }
-.ball.miss { opacity: 0.32; }
+.ball.miss { opacity: 0.28; filter: grayscale(0.35); }
+.ball.xs {
+  width: 18px;
+  height: 18px;
+  font-size: 0.55rem;
+  line-height: 18px;
+}
 .ball.red { background: var(--ball-red); }
 .ball.blue { background: var(--ball-blue); }
 .ball.green { background: var(--ball-green); }

@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖结果 · 冷热频次 · 遗漏 · 热力</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力</p>
       </div>
     </div>
 
@@ -30,34 +30,16 @@
     <div class="card mb-4">
       <div class="card-title">
         开奖结果
-        <span class="sub">{{ TYPE_NAMES[type] }} · 最近 {{ draws.length }} 期</span>
+        <span class="sub">{{ TYPE_NAMES[type] }} · 基本走势（开出为彩球，灰字为遗漏）</span>
       </div>
       <div v-if="drawsLoading" class="loading-line">加载开奖…</div>
-      <p v-else-if="!draws.length" class="text-sm text-muted">暂无开奖数据</p>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>期号</th>
-              <th>开奖日期</th>
-              <th>开奖号码</th>
-              <th>来源</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="d in draws" :key="d.id || d.issue">
-              <td class="mono">{{ d.issue }}</td>
-              <td>{{ d.draw_date || '—' }}</td>
-              <td><NumberBalls :numbers="d.numbers" :type="type" size="sm" /></td>
-              <td>
-                <span class="badge" :class="d.source === 'crawl' ? 'badge-info' : 'badge-muted'">
-                  {{ d.source === 'crawl' ? '爬取' : '示例' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <TrendChart
+        v-else
+        :type="type"
+        :draws="draws"
+        v-model:periods="periods"
+        :period-options="[50, 80, 120, 300]"
+      />
     </div>
 
     <div v-if="loading" class="loading-line">分析中…</div>
@@ -132,11 +114,13 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
+import TrendChart from '../components/TrendChart.vue'
 
 const route = useRoute()
 const type = ref(route.query.type || 'ssq')
 const data = ref(null)
 const draws = ref([])
+const periods = ref(50)
 const loading = ref(true)
 const drawsLoading = ref(true)
 
@@ -174,7 +158,7 @@ function barH(c) {
 async function loadDraws() {
   drawsLoading.value = true
   try {
-    const history = await api.draws(type.value, 30)
+    const history = await api.draws(type.value, 300)
     draws.value = history.items || []
   } catch (e) {
     console.error(e)
@@ -187,7 +171,7 @@ async function loadDraws() {
 async function loadAnalysis() {
   loading.value = true
   try {
-    data.value = await api.analysis(type.value)
+    data.value = await api.analysis(type.value, Math.max(periods.value, 50))
   } catch (e) {
     console.error(e)
     data.value = null
@@ -200,6 +184,10 @@ function load() {
   loadDraws()
   loadAnalysis()
 }
+
+watch(periods, () => {
+  loadAnalysis()
+})
 
 watch(() => route.query.type, (next) => {
   if (next && next !== type.value && TYPE_NAMES[next]) {

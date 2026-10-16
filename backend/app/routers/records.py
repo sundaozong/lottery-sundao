@@ -46,7 +46,6 @@ def list_records(db: Session = Depends(get_db)):
 
 
 def _store_numbers(lottery_type: str, numbers) -> str:
-    import json
     try:
         stored = canonical_bet(lottery_type, numbers)
     except ValueError as exc:
