@@ -635,3 +635,37 @@
   background: var(--bg-elevated);
 }
 .source-badge.crawl { color: var(--accent); border-color: var(--accent-border); background: var(--accent-dim); }
+
+/* ---------- 开奖回声 ---------- */
+.echo-list { margin-top: 14px; }
+.echo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.echo-draw { min-width: 0; }
+.echo-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.echo-score { flex: none; text-align: right; }
+.echo-score-num {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.2;
+}
+.echo-list .ball.hit {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}

@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声</p>
       </div>
     </div>
 
@@ -40,6 +40,69 @@
         v-model:periods="periods"
         :period-options="[50, 80, 120, 300]"
       />
+    </div>
+
+    <div class="mb-4">
+      <div class="section-head">
+        <span>开奖回声</span>
+        <span class="sub">{{ echoField.digit ? '按位对照' : '号码集合对照' }} · 近 80 期 · 仅供娱乐</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>回声对照仅供娱乐，不代表下期结果；请理性购彩。</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="echoMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="echoSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-primary" type="button" :disabled="echoLoading" @click="runEcho">
+            <AppIcon v-if="echoLoading" name="sync" :size="14" class="spin" />
+            {{ echoLoading ? '对照中…' : '对照' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="echoLoading" @click="fillLatestEcho">用最新开奖对照</button>
+        </div>
+        <p class="form-hint">
+          {{ echoField.digit ? '同一位置数字相同才算重合，顺序不能打乱。' : '看号码重合了几个，先后顺序不影响。' }}
+        </p>
+        <p v-if="echoError" class="bet-error">{{ echoError }}</p>
+        <div v-if="echoResult" class="echo-list">
+          <p class="text-xs text-muted">
+            样本 {{ echoResult.sample_size }} 期
+            <template v-if="echoResult.echoes.length"> · {{ echoResult.echoes.length }} 条回声</template>
+          </p>
+          <div v-if="!echoResult.echoes.length" class="empty">
+            <div class="empty-title">没有重合</div>
+            <div class="empty-desc">这注在样本里没有和历史开奖撞上的号码</div>
+          </div>
+          <div v-for="row in echoResult.echoes" :key="row.issue" class="echo-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span class="mono">第 {{ row.issue }} 期</span>
+                <span v-if="row.draw_date">{{ row.draw_date }}</span>
+                <span v-if="row.exact_match" class="source-badge">完全重合</span>
+              </div>
+              <NumberBalls
+                :numbers="{ main: row.main, special: row.special }"
+                :type="type"
+                :marks="echoMarks(row)"
+                size="sm"
+              />
+            </div>
+            <div class="echo-score">
+              <div class="echo-score-num">{{ row.score }}</div>
+              <div class="text-xs text-muted">主号 {{ row.main_shared }}<template v-if="showSpecialShare"> · 特别 {{ row.special_shared }}</template></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
@@ -215,6 +278,17 @@ import NumberBalls from '../components/NumberBalls.vue'
 import TrendChart from '../components/TrendChart.vue'
 import AppIcon from '../components/AppIcon.vue'
 
+const ECHO_FIELDS = {
+  ssq: { main: '01 02 03 04 05 06', special: '16', specialLabel: '蓝球', digit: false },
+  dlt: { main: '05 11 19 28 33', special: '02 10', specialLabel: '后区', digit: false },
+  qlc: { main: '03 08 12 18 21 25 29', special: '09', specialLabel: '特别号', digit: false },
+  kl8: { main: '01 05 12 18 22 27', special: '', specialLabel: '', digit: false },
+  fc3d: { main: '1 2 3', special: '', specialLabel: '', digit: true },
+  pl3: { main: '1 2 3', special: '', specialLabel: '', digit: true },
+  pl5: { main: '1 2 3 4 5', special: '', specialLabel: '', digit: true },
+  qxc: { main: '1 2 3 4 5 6', special: '7', specialLabel: '特别号', digit: true },
+}
+
 const route = useRoute()
 const type = ref(route.query.type || 'ssq')
 const data = ref(null)
@@ -223,6 +297,14 @@ const draws = ref([])
 const periods = ref(50)
 const loading = ref(true)
 const drawsLoading = ref(true)
+const echoMain = ref('')
+const echoSpecial = ref('')
+const echoResult = ref(null)
+const echoError = ref('')
+const echoLoading = ref(false)
+
+const echoField = computed(() => ECHO_FIELDS[type.value] || ECHO_FIELDS.ssq)
+const showSpecialShare = computed(() => Boolean(echoField.value.specialLabel))
 
 const displayFreq = computed(() => {
   if (!data.value) return []
@@ -290,8 +372,66 @@ async function loadAnalysis() {
   }
 }
 
+function splitNums(text) {
+  return String(text || '').trim().split(/[\s,，]+/).filter(Boolean)
+}
+
+function echoMarks(row) {
+  const query = echoResult.value?.query
+  if (!query) return null
+  const specialSet = new Set(row.shared_special || [])
+  if (echoResult.value.mode === 'digit') {
+    return {
+      main: (row.main || []).map((n, i) => (n === query.main[i] ? true : null)),
+      special: (row.special || []).map((n) => (specialSet.has(n) ? true : null)),
+    }
+  }
+  const mainSet = new Set(row.shared_main || [])
+  return {
+    main: (row.main || []).map((n) => (mainSet.has(n) ? true : null)),
+    special: (row.special || []).map((n) => (specialSet.has(n) ? true : null)),
+  }
+}
+
+async function runEcho() {
+  echoLoading.value = true
+  echoError.value = ''
+  try {
+    const main = splitNums(echoMain.value)
+    const special = echoField.value.specialLabel ? splitNums(echoSpecial.value) : []
+    echoResult.value = await api.echo(type.value, { main, special, limit: 80, top: 8 })
+  } catch (e) {
+    echoResult.value = null
+    echoError.value = e.message || '对照失败'
+  } finally {
+    echoLoading.value = false
+  }
+}
+
+async function fillLatestEcho() {
+  echoError.value = ''
+  try {
+    const history = await api.draws(type.value, 1)
+    const latest = history.items?.[0]
+    if (!latest) {
+      echoResult.value = null
+      echoError.value = '暂无开奖可对照'
+      return
+    }
+    echoMain.value = (latest.numbers?.main || []).join(' ')
+    echoSpecial.value = (latest.numbers?.special || []).join(' ')
+    await runEcho()
+  } catch (e) {
+    echoError.value = e.message || '读取开奖失败'
+  }
+}
+
 function load() {
   shape.value = null
+  echoResult.value = null
+  echoError.value = ''
+  echoMain.value = ''
+  echoSpecial.value = ''
   loadDraws()
   loadAnalysis()
 }
