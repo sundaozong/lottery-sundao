@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏</p>
       </div>
     </div>
 
@@ -482,6 +482,108 @@
       </div>
     </div>
 
+    <div class="mb-4">
+      <div class="section-head">
+        <span>重号脉搏</span>
+        <span class="sub">相邻两期 · 重号与新号 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ repeatPulse?.disclaimer || '重号脉搏只看相邻两期有没有把号码留下来，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="repeatMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="repeatSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-primary" type="button" :disabled="repeatLoading" @click="runRepeat">
+            <AppIcon v-if="repeatLoading" name="sync" :size="14" class="spin" />
+            {{ repeatLoading ? '对照中…' : '看这注' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="repeatLoading" @click="fillLatestRepeat">对照最新开奖</button>
+        </div>
+        <p class="form-hint">{{ repeatHint }}</p>
+        <p v-if="repeatError" class="bet-error">{{ repeatError }}</p>
+
+        <div v-if="repeatPulseLoading && !repeatPulse" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计脉搏…
+        </div>
+        <div v-else-if="repeatPulse" class="repeat-list">
+          <p class="text-xs text-muted">
+            样本 {{ repeatPulse.sample_size }} 期 · {{ repeatPulse.pair_count }} 次交接
+            · 平均 {{ repeatStat(repeatPulse.mean) }} · 中位 {{ repeatStat(repeatPulse.median) }} · 最多 {{ repeatStat(repeatPulse.max) }}
+          </p>
+          <div v-if="repeatPulse.latest_draw" class="repeat-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ repeatPulse.latest_draw.issue }} 期</span>
+              </div>
+              <NumberBalls :numbers="repeatPulse.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!repeatPulse.pair_count" class="empty">
+            <div class="empty-title">还没有相邻开奖</div>
+            <div class="empty-desc">看不出重号脉搏。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">重号分布 <span class="sub">相邻两期主号重了几个，特别号不计入</span></div>
+            <div class="repeat-bars">
+              <div v-for="bucket in repeatPulse.distribution" :key="bucket.overlap" class="repeat-bar">
+                <span class="mono">{{ bucket.overlap }}</span>
+                <span class="repeat-bar-track">
+                  <span class="repeat-bar-fill" :style="{ width: repeatBarWidth(bucket.count) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <div class="card-title mt-3">最近交接 <span class="sub">较早一期留下的号亮着，新号变淡</span></div>
+            <div v-for="pair in repeatRecent" :key="pair.issue_from + '-' + pair.issue_to" class="repeat-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span class="mono">{{ pair.issue_from }} → {{ pair.issue_to }}</span>
+                  <span v-if="pair.special_overlap">特别号重了 {{ pair.special_overlap }} 个，不计入主号</span>
+                </div>
+                <NumberBalls :numbers="repeatPairNumbers(pair)" :type="type" :marks="repeatPairMarks(pair)" size="sm" />
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ pair.overlap }}</div>
+                <div class="text-xs text-muted">重号</div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="repeatScore" class="repeat-score">
+            <div class="card-title">这注对照最新开奖</div>
+            <div v-if="repeatScore.message" class="empty">
+              <div class="empty-title">还对不上</div>
+              <div class="empty-desc">{{ repeatSummary }}</div>
+            </div>
+            <template v-else>
+              <p class="text-xs text-muted">{{ repeatSummary }}</p>
+              <div class="repeat-row">
+                <div class="echo-draw">
+                  <div class="echo-meta"><span>这注</span><span>亮圈是重号，变淡的是新号</span></div>
+                  <NumberBalls :numbers="repeatScoreView.numbers" :type="type" :marks="repeatScoreView.marks" size="sm" />
+                </div>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ repeatScore.overlap }}</div>
+                  <div class="text-xs text-muted">重号</div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -738,6 +840,15 @@ const collisionResult = ref(null)
 const collisionError = ref('')
 const collisionLoading = ref(false)
 const collisionUsePad = ref(false)
+const repeatMain = ref('')
+const repeatSpecial = ref('')
+const repeatPulse = ref(null)
+const repeatScore = ref(null)
+const repeatError = ref('')
+const repeatLoading = ref(false)
+const repeatPulseLoading = ref(false)
+let repeatToken = 0
+const REPEAT_LIMIT = 80
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -756,6 +867,51 @@ const affinityGroups = computed(() => {
   }))
 })
 const showSpecialShare = computed(() => Boolean(echoField.value.specialLabel))
+const repeatHint = computed(() => (
+  echoField.value.digit
+    ? '同一位置数字相同才算重号，顺序不能打乱。仅供娱乐，不构成投注建议。'
+    : '主号看和上一期重了几个，特别号单独算，不计入重号。仅供娱乐，不构成投注建议。'
+))
+const repeatRecent = computed(() => (repeatPulse.value?.recent_pairs || []).slice(0, 8))
+const repeatSummary = computed(() => {
+  const score = repeatScore.value
+  if (!score) return ''
+  if (score.message) return `${score.message}。仅供娱乐，不构成投注建议。`
+  const fresh = (score.fresh_main || []).length
+  let text = `这注重号 ${score.overlap} 个，新号 ${fresh} 个`
+  if (score.special_overlap) text += `，特别号重了 ${score.special_overlap} 个，不计入主号`
+  if (score.percentile == null) {
+    text += '。相邻样本还不够，看不出这注排在哪里'
+  } else {
+    const pct = Math.round(Number(score.percentile) * 100)
+    const heavier = Math.max(0, Number(score.rank || 1) - 1)
+    text += `。近 ${score.pair_count} 次相邻交接里，${pct}% 的重号个数不超过这次，有 ${heavier} 次更重`
+  }
+  return `${text}。仅供娱乐，不构成投注建议。`
+})
+const repeatScoreView = computed(() => {
+  const score = repeatScore.value
+  if (!score?.query) return { numbers: { main: [], special: [] }, marks: null }
+  if (score.mode === 'digit') {
+    const positions = (score.positions || []).map((pos) => [pos.ticket])
+    const marks = (score.positions || []).map((pos) => [Boolean(pos.repeat)])
+    if ((score.query.special || []).length) {
+      const shared = new Set(score.repeat_special || [])
+      positions.push(score.query.special)
+      marks.push(score.query.special.map((n) => shared.has(String(n))))
+    }
+    return { numbers: { positions }, marks: { positions: marks } }
+  }
+  const shared = new Set(score.repeat_main || [])
+  const sharedSpecial = new Set(score.repeat_special || [])
+  return {
+    numbers: { main: score.query.main, special: score.query.special },
+    marks: {
+      main: (score.query.main || []).map((n) => shared.has(String(n))),
+      special: (score.query.special || []).map((n) => sharedSpecial.has(String(n))),
+    },
+  }
+})
 
 const displayFreq = computed(() => {
   if (!data.value) return []
@@ -1011,6 +1167,91 @@ function collisionMarks(ticket) {
   }
 }
 
+function repeatStat(value) {
+  if (value == null || value === '') return '—'
+  const num = Number(value)
+  if (!Number.isFinite(num)) return '—'
+  return String(Math.round(num * 100) / 100)
+}
+
+function repeatBarWidth(count) {
+  const rows = repeatPulse.value?.distribution || []
+  const max = Math.max(...rows.map((row) => row.count), 1)
+  if (!count) return '0%'
+  return `${Math.max(8, Math.round((count / max) * 100))}%`
+}
+
+function repeatPairNumbers(pair) {
+  if (repeatPulse.value?.mode === 'digit') {
+    const positions = (pair.positions || []).map((pos) => [pos.to || ''])
+    if ((pair.special || []).length) positions.push(pair.special)
+    return { positions }
+  }
+  return { main: pair.main, special: pair.special }
+}
+
+function repeatPairMarks(pair) {
+  if (repeatPulse.value?.mode === 'digit') {
+    const positions = (pair.positions || []).map((pos) => [Boolean(pos.repeat)])
+    if ((pair.special || []).length) {
+      const shared = new Set(pair.shared_special || [])
+      positions.push(pair.special.map((n) => shared.has(String(n))))
+    }
+    return { positions }
+  }
+  const shared = new Set(pair.shared_main || [])
+  const sharedSpecial = new Set(pair.shared_special || [])
+  return {
+    main: (pair.main || []).map((n) => shared.has(String(n))),
+    special: (pair.special || []).map((n) => sharedSpecial.has(String(n))),
+  }
+}
+
+async function loadRepeat() {
+  const token = ++repeatToken
+  repeatPulseLoading.value = true
+  try {
+    const body = await api.repeat(type.value, REPEAT_LIMIT)
+    if (token !== repeatToken) return
+    repeatPulse.value = body
+  } catch (e) {
+    if (token !== repeatToken) return
+    repeatPulse.value = null
+    repeatError.value = e.message || '脉搏加载失败'
+  } finally {
+    if (token === repeatToken) repeatPulseLoading.value = false
+  }
+}
+
+async function runRepeat() {
+  repeatLoading.value = true
+  repeatError.value = ''
+  try {
+    const main = splitNums(repeatMain.value)
+    const special = echoField.value.specialLabel ? splitNums(repeatSpecial.value) : []
+    repeatScore.value = await api.repeatScore(type.value, { main, special, limit: REPEAT_LIMIT })
+  } catch (e) {
+    repeatScore.value = null
+    repeatError.value = e.message || '对照失败'
+  } finally {
+    repeatLoading.value = false
+  }
+}
+
+async function fillLatestRepeat() {
+  repeatError.value = ''
+  if (!repeatPulse.value) await loadRepeat()
+  const latest = repeatPulse.value?.latest_draw
+  if (!latest) {
+    repeatScore.value = null
+    repeatError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  repeatMain.value = (latest.main || []).join(' ')
+  repeatSpecial.value = (latest.special || []).join(' ')
+  await runRepeat()
+}
+
 async function runCollision(fromRecords) {
   collisionLoading.value = true
   collisionError.value = ''
@@ -1063,9 +1304,15 @@ function load() {
   affinityError.value = ''
   affinitySeed.value = ''
   resetCollision()
+  repeatPulse.value = null
+  repeatScore.value = null
+  repeatError.value = ''
+  repeatMain.value = ''
+  repeatSpecial.value = ''
   loadDraws()
   loadAnalysis()
   loadAffinity()
+  loadRepeat()
 }
 
 watch(periods, () => {
