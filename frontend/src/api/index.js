@@ -20,18 +20,32 @@ export const api = {
   crawl: (type) =>
     request(`/api/draws/crawl${type ? `?lottery_type=${type}` : ''}`, { method: 'POST' }),
   analysis: (type, limit = 50) => request(`/api/analysis/${type}?limit=${limit}`),
+  shape: (type, limit = 50) => request(`/api/analysis/${type}/shape?limit=${limit}`),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
+  recordMonths: () => request('/api/records/monthly'),
+  rhythm: () => request('/api/records/rhythm'),
   createRecord: (body) => request('/api/records', { method: 'POST', body: JSON.stringify(body) }),
   updateRecord: (id, body) => request(`/api/records/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteRecord: (id) => request(`/api/records/${id}`, { method: 'DELETE' }),
   prizeRules: () => request('/api/prize/rules'),
   prizeCalc: (body) => request('/api/prize/calc', { method: 'POST', body: JSON.stringify(body) }),
+  backtest: (body) => request('/api/prize/backtest', { method: 'POST', body: JSON.stringify(body) }),
   settings: () => request('/api/settings'),
   saveSettings: (body) => request('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
   mailTest: (to) => request('/api/mail/test', { method: 'POST', body: JSON.stringify({ to }) }),
   mailDigest: () => request('/api/mail/digest', { method: 'POST' }),
   mailPredict: (body) => request('/api/mail/predict', { method: 'POST', body: JSON.stringify(body) }),
+}
+
+export async function downloadRecords() {
+  const res = await fetch('/api/records/export')
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    const msg = data.detail || data.error || res.statusText
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+  }
+  return res.blob()
 }
 
 export const TYPE_NAMES = {

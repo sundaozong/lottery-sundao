@@ -5,10 +5,16 @@
         <h1>购买记录</h1>
         <p>流水 · 盈亏汇总 · CRUD</p>
       </div>
-      <button class="btn btn-primary btn-sm" type="button" @click="openForm">
-        <AppIcon :name="showForm ? 'x' : 'plus'" :size="13" />
-        {{ showForm ? '收起' : '记一笔' }}
-      </button>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm" type="button" :disabled="exporting" @click="exportCsv">
+          <AppIcon name="download" :size="13" />
+          {{ exporting ? '导出中…' : '导出 CSV' }}
+        </button>
+        <button class="btn btn-primary btn-sm" type="button" @click="openForm">
+          <AppIcon :name="showForm ? 'x' : 'plus'" :size="13" />
+          {{ showForm ? '收起' : '记一笔' }}
+        </button>
+      </div>
     </div>
 
     <div class="grid grid-3 mb-4">
@@ -25,6 +31,48 @@
         <div class="stat-value" :class="(summary.net || 0) >= 0 ? 'ok' : 'danger'">
           ¥ {{ summary.net ?? 0 }}
         </div>
+      </div>
+    </div>
+
+    <div v-if="repeats.length" class="card mb-4">
+      <div class="card-title">同一注 <span class="sub">号码相同、位次相同，忽略倍数和填写顺序</span></div>
+      <div class="table-wrap table-wrap-plain">
+        <table>
+          <thead>
+            <tr><th>彩种</th><th>号码</th><th>次数</th><th>期号</th><th>投入</th><th>奖金</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="group in repeats" :key="group.lottery_type + group.numbers_text">
+              <td>{{ group.name }}<div class="text-xs text-muted">{{ group.play_name }}</div></td>
+              <td class="mono">{{ group.numbers_text }}</td>
+              <td class="mono">{{ group.count }}</td>
+              <td class="mono">{{ group.issues.join('、') }}</td>
+              <td class="mono">{{ group.total_cost }}</td>
+              <td class="mono">{{ group.total_prize }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-muted mt-3">{{ rhythmNote }}</p>
+    </div>
+
+    <div v-if="months.length" class="card mb-4">
+      <div class="card-title">按月汇总 <span class="sub">按购买日期，未填日期单独成组</span></div>
+      <div class="table-wrap table-wrap-plain">
+        <table>
+          <thead>
+            <tr><th>月份</th><th>笔数</th><th>投入</th><th>奖金</th><th>盈亏</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="month in months" :key="month.month">
+              <td>{{ month.month }}</td>
+              <td class="mono">{{ month.count }}</td>
+              <td class="mono">{{ month.total_cost }}</td>
+              <td class="mono">{{ month.total_prize }}</td>
+              <td class="mono" :class="month.net >= 0 ? 'profit-pos' : 'profit-neg'">{{ month.net }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -126,7 +174,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch, onMounted } from 'vue'
-import { api, TYPE_NAMES } from '../api'
+import { api, downloadRecords, TYPE_NAMES } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import BetFields from '../components/BetFields.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -134,7 +182,11 @@ import { toast, confirmDialog } from '../composables/feedback'
 
 const items = ref([])
 const summary = ref({})
+const months = ref([])
+const repeats = ref([])
+const rhythmNote = ref('')
 const showForm = ref(false)
+const exporting = ref(false)
 const editingId = ref(null)
 const form = ref(blank())
 const bet = ref(defaultBet('ssq'))
@@ -265,6 +317,32 @@ async function load() {
   const res = await api.records()
   items.value = res.items || []
   summary.value = res.summary || {}
+  try {
+    const [monthRes, rhythmRes] = await Promise.all([api.recordMonths(), api.rhythm()])
+    months.value = monthRes.months || []
+    repeats.value = rhythmRes.repeat_groups || []
+    rhythmNote.value = rhythmRes.disclaimer || ''
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+async function exportCsv() {
+  exporting.value = true
+  try {
+    const blob = await downloadRecords()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '购买记录.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+    toast('已导出购买记录', 'ok')
+  } catch (e) {
+    toast(e.message, 'error', 4000)
+  } finally {
+    exporting.value = false
+  }
 }
 
 function resetForm() {

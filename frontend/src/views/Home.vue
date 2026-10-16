@@ -52,6 +52,11 @@
       </div>
     </div>
 
+    <router-link v-if="rhythm && rhythm.slip_count" class="card rhythm-card mb-4" to="/records">
+      <div class="card-title">花费节奏 <span class="sub">对照自己的账本</span></div>
+      <p class="rhythm-line">{{ rhythmText }}</p>
+    </router-link>
+
     <div class="mb-4">
       <div class="quick-grid">
         <router-link class="quick-item" to="/analysis"><AppIcon name="chart" />分析走势</router-link>
@@ -101,7 +106,19 @@ import AppIcon from '../components/AppIcon.vue'
 const schedule = lotteriesOn()
 const draws = ref([])
 const summary = ref({})
+const rhythm = ref(null)
 const loading = ref(true)
+
+const rhythmText = computed(() => {
+  const info = rhythm.value
+  if (!info) return ''
+  const delta = info.cost_delta
+  const pace = delta > 0 ? `比上月多 ¥${delta}` : delta < 0 ? `比上月少 ¥${Math.abs(delta)}` : '与上月一样'
+  const same = info.repeat_groups.length
+    ? `有 ${info.repeat_groups.length} 组号码买过多次`
+    : '没有重复买过的号码'
+  return `本月 ¥${info.current.total_cost} · 上月 ¥${info.previous.total_cost} · ${pace} · ${same}`
+})
 
 const statusHint = computed(() => {
   const sources = draws.value.map((d) => d.source)
@@ -113,9 +130,17 @@ const statusHint = computed(() => {
 
 onMounted(async () => {
   try {
-    const [latest, records] = await Promise.all([api.latest(), api.records()])
+    const [latest, records, rhythmRes] = await Promise.all([
+      api.latest(),
+      api.records(),
+      api.rhythm().catch((error) => {
+        console.error(error)
+        return null
+      }),
+    ])
     draws.value = latest.items || []
     summary.value = records.summary || {}
+    rhythm.value = rhythmRes
   } catch (e) {
     console.error(e)
   } finally {

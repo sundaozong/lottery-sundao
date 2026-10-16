@@ -50,6 +50,15 @@ class PrizeCalcIn(BaseModel):
     pick: Optional[int] = None
 
 
+class BacktestIn(BaseModel):
+    lottery_type: str
+    bet_numbers: Any
+    multiple: int = 1
+    play: Optional[str] = None
+    pick: Optional[int] = None
+    limit: int = Field(default=30, ge=1, le=200)
+
+
 class PredictIn(BaseModel):
     lottery_type: str
     strategy: str = "hot"  # hot | cold | random | hybrid

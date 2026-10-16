@@ -92,6 +92,104 @@
         </div>
       </div>
 
+      <div v-if="shape" class="mb-4">
+        <div class="section-head">
+          <span>号码形态</span>
+          <span class="sub">近 {{ shape.sample_size }} 期主号 · 不含蓝球/特别号 · 仅供娱乐</span>
+        </div>
+        <div v-if="!shape.sample_size" class="card">
+          <div class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有主号样本后，这里会统计奇偶、大小、和值与连号</div>
+          </div>
+        </div>
+        <template v-else>
+          <div class="grid grid-4 mb-4">
+            <div class="card stat">
+              <div class="stat-label">和值均值</div>
+              <div class="stat-value">{{ shape.sum.avg }}</div>
+            </div>
+            <div class="card stat">
+              <div class="stat-label">{{ shape.mode === 'set' ? '含连号' : '跨度均值' }}</div>
+              <div class="stat-value">{{ shape.mode === 'set' ? `${shape.consecutive.draws_with}/${shape.sample_size}` : shape.span.avg }}</div>
+            </div>
+            <div class="card stat">
+              <div class="stat-label">常见奇偶</div>
+              <div class="stat-value compact">{{ shape.odd_even[0]?.label || '—' }}</div>
+            </div>
+            <div class="card stat">
+              <div class="stat-label">常见大小</div>
+              <div class="stat-value compact">{{ shape.big_small[0]?.label || '—' }}</div>
+            </div>
+          </div>
+          <p class="text-xs text-muted mb-4">
+            连号 {{ shape.consecutive.draws_with }} 期，平均 {{ shape.consecutive.avg_pairs }} 组
+            · 和值 {{ shape.sum.min }}–{{ shape.sum.max }}
+            · 跨度 {{ shape.span.min }}–{{ shape.span.max }}
+          </p>
+          <div class="grid grid-2 mb-4">
+            <div class="card">
+              <div class="card-title">奇偶 <span class="sub">主号个数</span></div>
+              <div class="table-wrap table-wrap-plain">
+                <table>
+                  <thead><tr><th>比例</th><th>期数</th></tr></thead>
+                  <tbody>
+                    <tr v-for="row in shape.odd_even.slice(0, 8)" :key="row.label">
+                      <td>{{ row.label }}</td>
+                      <td class="mono">{{ row.count }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">和值区间</div>
+              <div class="table-wrap table-wrap-plain">
+                <table>
+                  <thead><tr><th>区间</th><th>期数</th></tr></thead>
+                  <tbody>
+                    <tr v-for="row in shape.sum.buckets" :key="row.label">
+                      <td class="mono">{{ row.label }}</td>
+                      <td class="mono">{{ row.count }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div v-if="shape.zones.length || shape.patterns.length" class="grid grid-2">
+            <div v-if="shape.zones.length" class="card">
+              <div class="card-title">区间 <span class="sub">平均个数</span></div>
+              <div class="table-wrap table-wrap-plain">
+                <table>
+                  <thead><tr><th>区间</th><th>平均</th></tr></thead>
+                  <tbody>
+                    <tr v-for="row in shape.zones" :key="row.label">
+                      <td>{{ row.label }}</td>
+                      <td class="mono">{{ row.avg }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div v-if="shape.patterns.length" class="card">
+              <div class="card-title">三位形态</div>
+              <div class="table-wrap table-wrap-plain">
+                <table>
+                  <thead><tr><th>形态</th><th>期数</th></tr></thead>
+                  <tbody>
+                    <tr v-for="row in shape.patterns" :key="row.label">
+                      <td>{{ row.label }}</td>
+                      <td class="mono">{{ row.count }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
       <div class="card">
         <div class="card-title">遗漏（距今期数）</div>
         <div class="table-wrap">
@@ -120,6 +218,7 @@ import AppIcon from '../components/AppIcon.vue'
 const route = useRoute()
 const type = ref(route.query.type || 'ssq')
 const data = ref(null)
+const shape = ref(null)
 const draws = ref([])
 const periods = ref(50)
 const loading = ref(true)
@@ -171,17 +270,28 @@ async function loadDraws() {
 
 async function loadAnalysis() {
   loading.value = true
+  const limit = Math.max(periods.value, 50)
   try {
-    data.value = await api.analysis(type.value, Math.max(periods.value, 50))
+    const [analysis, shapeRes] = await Promise.all([
+      api.analysis(type.value, limit),
+      api.shape(type.value, limit).catch((e) => {
+        console.error(e)
+        return null
+      }),
+    ])
+    data.value = analysis
+    shape.value = shapeRes
   } catch (e) {
     console.error(e)
     data.value = null
+    shape.value = null
   } finally {
     loading.value = false
   }
 }
 
 function load() {
+  shape.value = null
   loadDraws()
   loadAnalysis()
 }

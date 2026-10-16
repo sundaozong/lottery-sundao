@@ -151,6 +151,19 @@
 .router-link-active.mobile-tab {
   color: var(--accent);
 }
+.stat-value.compact { font-size: 1.15rem; }
+.rhythm-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.rhythm-card:hover { border-color: var(--border-strong); }
+.rhythm-line {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text);
+}
 .profit-pos { color: var(--success); }
 .profit-neg { color: var(--danger); }
 .form-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: var(--space-3); }
