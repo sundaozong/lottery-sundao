@@ -34,6 +34,10 @@ def _pick(pool: list[str], weights: list[float], k: int) -> list[str]:
 
 
 def generate(db: Session, lottery_type: str, strategy: str = "hot", count: int = 1) -> dict:
+    if (strategy or "").strip().lower() == "pulse":
+        from .pulse_ensemble import generate_pulse
+
+        return generate_pulse(db, lottery_type, count=count)
     t = normalize_type(lottery_type)
     stats = analyze(db, t, limit=50)
     main_freq = stats["main_freq"]

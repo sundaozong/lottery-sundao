@@ -10,7 +10,7 @@
     <div class="alert alert-disclaimer">
       <AppIcon name="info" :size="14" style="margin-top:2px;flex:none" />
       <div>
-        <strong>仅供娱乐。</strong>冷热/随机/混合策略均基于历史样本的统计玩具，
+        <strong>仅供娱乐。</strong>冷热、随机、混合与脉动综合均基于历史样本的统计玩具，
         <strong>不构成投注建议</strong>，亦不保证中奖。请理性购彩，量力而行。
       </div>
     </div>
@@ -32,6 +32,7 @@
                 <option value="cold">冷号加权</option>
                 <option value="hybrid">冷热混合</option>
                 <option value="random">纯随机</option>
+                <option value="pulse">脉动综合</option>
               </select>
               <p class="strategy-desc">{{ strategyHint }}</p>
             </div>
@@ -44,7 +45,7 @@
             <div class="form-group predict-actions">
               <button class="btn btn-primary" type="button" :disabled="loading" @click="run">
                 <AppIcon v-if="loading" name="sync" :size="14" class="spin" />
-                {{ loading ? '生成中…' : '生成推荐' }}
+                {{ loading ? (strategy === 'pulse' ? '综合打分中…' : '生成中…') : '生成推荐' }}
               </button>
               <button
                 class="btn btn-ghost"
@@ -62,12 +63,43 @@
         <div v-if="result" class="card mb-4">
           <div class="card-title">
             推荐方案
-            <span class="sub">{{ TYPE_NAMES[result.lottery_type] || result.lottery_type }} · {{ result.strategy }}</span>
+            <span class="sub">{{ TYPE_NAMES[result.lottery_type] || result.lottery_type }} · {{ strategyName(result.strategy) }}</span>
           </div>
           <div class="predict-rows">
-            <div v-for="(rec, i) in result.recommendations" :key="i" class="predict-row">
-              <span class="predict-row-label">方案 {{ i + 1 }}</span>
-              <NumberBalls :numbers="rec" :type="result.lottery_type" />
+            <div
+              v-for="(rec, i) in result.recommendations"
+              :key="i"
+              class="predict-row"
+              :class="{ 'pulse-row': result.strategy === 'pulse' }"
+            >
+              <template v-if="result.strategy === 'pulse'">
+                <div class="pulse-top">
+                  <span class="predict-row-label">方案 {{ i + 1 }}</span>
+                  <NumberBalls :numbers="rec" :type="result.lottery_type" />
+                  <span class="pulse-score" :title="'综合 ' + formatScore(rec.score)">{{ formatScore(rec.score) }}</span>
+                </div>
+                <p class="pulse-rationale">{{ rec.rationale }}</p>
+                <div class="pulse-chips">
+                  <span
+                    v-for="item in rec.breakdown || []"
+                    :key="item.module"
+                    class="pulse-chip"
+                    :class="chipClass(item.score)"
+                    :title="item.note || '暂无对照'"
+                  >{{ item.label }} {{ formatScore(item.score) }}</span>
+                </div>
+                <details class="pulse-detail">
+                  <summary>分项说明</summary>
+                  <p v-for="item in rec.breakdown || []" :key="item.module + '-note'">
+                    <strong>{{ item.label }}</strong>
+                    {{ item.note || '暂无对照' }}
+                  </p>
+                </details>
+              </template>
+              <template v-else>
+                <span class="predict-row-label">方案 {{ i + 1 }}</span>
+                <NumberBalls :numbers="rec" :type="result.lottery_type" />
+              </template>
             </div>
           </div>
           <p class="text-xs text-muted mt-2">娱乐推荐 · 请勿当真</p>
@@ -124,12 +156,37 @@ const result = ref(null)
 const recent = ref([])
 const recentLoading = ref(false)
 
+const STRATEGY_NAMES = {
+  hot: '热号加权',
+  cold: '冷号加权',
+  hybrid: '冷热混合',
+  random: '纯随机',
+  pulse: '脉动综合',
+}
+
 const strategyHint = computed(() => ({
   hot: '更偏向近期出现次数多的号码',
   cold: '更偏向近期出现少的号码',
   hybrid: '在热号基础上略保留冷号机会',
   random: '均匀随机，与历史无关',
+  pulse: '用重号、动量、邻号、跨度、连号簇、012路、和值、奇偶对照近期形态，分数不是中奖预测',
 }[strategy.value]))
+
+function strategyName(value) {
+  return STRATEGY_NAMES[value] || value
+}
+
+function formatScore(score) {
+  if (score === null || score === undefined || Number.isNaN(Number(score))) return '—'
+  return Number(score).toFixed(2)
+}
+
+function chipClass(score) {
+  if (score === null || score === undefined || Number.isNaN(Number(score))) return ''
+  if (score >= 0.66) return 'high'
+  if (score >= 0.4) return 'mid'
+  return 'low'
+}
 
 const recentHint = computed(() => {
   if (recentLoading.value) return '加载中…'
@@ -188,6 +245,11 @@ watch(lotteryType, () => {
   result.value = null
   mailMsg.value = ''
   loadRecent()
+})
+
+watch(strategy, () => {
+  result.value = null
+  mailMsg.value = ''
 })
 
 onMounted(loadRecent)
