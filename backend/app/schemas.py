@@ -80,6 +80,13 @@ class MomentumIn(BaseModel):
     long: int = Field(default=50, ge=20, le=200)
 
 
+class NeighborIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    horizon: int = Field(default=3, ge=1, le=10)
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None

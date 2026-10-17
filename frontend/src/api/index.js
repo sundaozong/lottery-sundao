@@ -39,6 +39,14 @@ export const api = {
     return request(`/api/analysis/${type}/momentum?${params}`)
   },
   momentumScore: (type, body) => request(`/api/analysis/${type}/momentum`, { method: 'POST', body: JSON.stringify(body) }),
+  neighbor: (type, { limit = 80, horizon = 3 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      horizon: String(horizon),
+    })
+    return request(`/api/analysis/${type}/neighbor?${params}`)
+  },
+  neighborScore: (type, body) => request(`/api/analysis/${type}/neighbor`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -62,6 +70,14 @@ export function getMomentum(type, params) {
 
 export function postMomentum(type, body) {
   return api.momentumScore(type, body)
+}
+
+export function getNeighbor(type, params) {
+  return api.neighbor(type, params)
+}
+
+export function postNeighbor(type, body) {
+  return api.neighborScore(type, body)
 }
 
 export async function downloadRecords() {
