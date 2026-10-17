@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值</p>
       </div>
     </div>
 
@@ -1434,6 +1434,159 @@
       </div>
     </div>
 
+    <div class="mb-4" id="sum-pulse">
+      <div class="section-head">
+        <span>和值脉动</span>
+        <span class="sub">短窗对比长窗 · 走高与走低 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ sumPulse?.disclaimer || '和值脉动看主号和值的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="sumLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="sumShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="sumLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="sumMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="sumSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="sumBoardLoading" @click="loadSum">
+            <AppIcon v-if="sumBoardLoading" name="sync" :size="14" class="spin" />
+            {{ sumBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="sumLoading" @click="runSum">
+            <AppIcon v-if="sumLoading" name="sync" :size="14" class="spin" />
+            {{ sumLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="sumLoading" @click="fillLatestSum">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ sumHint }}</p>
+        <p v-if="sumError" class="bet-error">{{ sumError }}</p>
+
+        <div v-if="sumBoardLoading && !sumPulse" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计和值…
+        </div>
+        <div v-else-if="sumPulse" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ sumPulse.sample_size }} 期 · 平均 {{ spanStat(sumPulse.mean) }} · 中位 {{ spanStat(sumPulse.median) }}
+            · 短窗 {{ spanStat(sumPulse.short_avg) }} · 长窗 {{ spanStat(sumPulse.long_avg) }} · 脉动 {{ spanSigned(sumPulse.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(sumPulse.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ sumPulse.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="sumPulse.drift || 'flat'">{{ sumDriftLabel(sumPulse.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(sumPulse.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ sumPulse.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="sumPulse.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ sumPulse.latest_draw.issue }} 期</span>
+                <span>和值 {{ sumPulse.latest_draw.sum }}</span>
+              </div>
+              <NumberBalls :numbers="sumPulse.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!sumPulse.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看主号和值的分布，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              和值分布
+              <span class="sub">{{ sumPulse.basis === 'digits' ? '整注各位数字相加' : '主号去重后相加' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in sumBars" :key="bucket.sum" class="span-bar" :class="{ 'is-current': sumCurrent(bucket.sum) }">
+                <span class="mono">{{ bucket.sum }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, sumPulse.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <p v-if="sumBarsCollapsed" class="text-xs text-muted">和值拉得比较开，这里只展开出现过的档。</p>
+            <div v-if="sumPulse.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in sumPulse.common" :key="'c' + item.sum" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="ball sm" :class="ballClass(type)">{{ item.sum }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="sumPulse.special" class="span-pos">
+              <div class="card-title">{{ sumPulse.special.label }} <span class="sub">至少两个特别号才算和值，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ sumPulse.special.sample_size }} 期 · 短窗 {{ spanStat(sumPulse.special.short_avg) }} · 长窗 {{ spanStat(sumPulse.special.long_avg) }}
+                · {{ sumDriftLabel(sumPulse.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in sumSpecialBars" :key="'s' + bucket.sum" class="span-bar">
+                  <span class="mono">{{ bucket.sum }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, sumPulse.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="sumScore" class="span-score">
+            <div class="card-title">这注的和值</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(sumScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(sumScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ sumScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ sumScore.ticket.sum }}</div>
+                <div class="text-xs text-muted">和值</div>
+              </div>
+            </div>
+            <div v-if="sumSpecialScored" class="span-pos">
+              <div class="card-title">{{ sumPulse.special?.label || '特别号' }} <span class="sub">这注的特别号和值，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ sumScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ sumScore.special_ticket.sum }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(sumScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -1602,7 +1755,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -1752,6 +1905,17 @@ const roadError = ref('')
 const roadLoading = ref(false)
 const roadBoardLoading = ref(false)
 let roadToken = 0
+const sumLimit = ref(80)
+const sumShort = ref(10)
+const sumLong = ref(50)
+const sumMain = ref('')
+const sumSpecial = ref('')
+const sumPulse = ref(null)
+const sumScore = ref(null)
+const sumError = ref('')
+const sumLoading = ref(false)
+const sumBoardLoading = ref(false)
+let sumToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -1846,6 +2010,18 @@ const roadBarsCollapsed = computed(() => {
 })
 const roadSpecialBars = computed(() => pulseVisibleBars(road.value?.special?.distribution, 'imbalance'))
 const roadSpecialScored = computed(() => roadScore.value?.special_ticket?.imbalance != null)
+const sumHint = computed(() => (
+  echoField.value.digit
+    ? '整注各位数字相加，0 和 9 不绕圈。特别号不计入主号和值。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+    : '主号去重后各号相加，特别号不计入。有两个及以上特别号时另看它们的和值。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+))
+const sumBars = computed(() => pulseVisibleBars(sumPulse.value?.distribution, 'sum'))
+const sumBarsCollapsed = computed(() => {
+  const rows = sumPulse.value?.distribution || []
+  return sumBars.value.length < rows.length
+})
+const sumSpecialBars = computed(() => pulseVisibleBars(sumPulse.value?.special?.distribution, 'sum'))
+const sumSpecialScored = computed(() => sumScore.value?.special_ticket?.sum != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -2672,6 +2848,86 @@ async function runRoad() {
   }
 }
 
+function sumWindows() {
+  let limit = Math.round(Number(sumLimit.value))
+  let short = Math.round(Number(sumShort.value))
+  let long = Math.round(Number(sumLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  sumLimit.value = limit
+  sumShort.value = short
+  sumLong.value = long
+  return { limit, short, long }
+}
+
+function sumDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function sumCurrent(value) {
+  return sumScore.value?.ticket?.sum === value
+}
+
+async function loadSum() {
+  const token = ++sumToken
+  sumBoardLoading.value = true
+  const params = sumWindows()
+  try {
+    const body = await getSum(type.value, params)
+    if (token !== sumToken) return
+    sumPulse.value = body
+    sumScore.value = null
+    sumError.value = ''
+  } catch (e) {
+    if (token !== sumToken) return
+    sumPulse.value = null
+    sumScore.value = null
+    sumError.value = e.message || '和值加载失败'
+  } finally {
+    if (token === sumToken) sumBoardLoading.value = false
+  }
+}
+
+async function runSum() {
+  sumLoading.value = true
+  sumError.value = ''
+  const params = sumWindows()
+  try {
+    const main = splitNums(sumMain.value)
+    const special = echoField.value.specialLabel ? splitNums(sumSpecial.value) : []
+    const body = await postSum(type.value, { main, special, ...params })
+    sumPulse.value = body
+    sumScore.value = body
+  } catch (e) {
+    sumScore.value = null
+    sumError.value = e.message || '打分失败'
+  } finally {
+    sumLoading.value = false
+  }
+}
+
+async function fillLatestSum() {
+  sumError.value = ''
+  if (!sumPulse.value) await loadSum()
+  const latest = sumPulse.value?.latest_draw
+  if (!latest) {
+    sumScore.value = null
+    sumError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  sumMain.value = (latest.main || []).join(' ')
+  sumSpecial.value = (latest.special || []).join(' ')
+  await runSum()
+}
+
 async function fillLatestRoad() {
   roadError.value = ''
   if (!road.value) await loadRoad()
@@ -2851,6 +3107,14 @@ function load() {
   roadLimit.value = 80
   roadShort.value = 10
   roadLong.value = 50
+  sumPulse.value = null
+  sumScore.value = null
+  sumError.value = ''
+  sumMain.value = ''
+  sumSpecial.value = ''
+  sumLimit.value = 80
+  sumShort.value = 10
+  sumLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -2860,6 +3124,7 @@ function load() {
   loadSpan()
   loadCluster()
   loadRoad()
+  loadSum()
 }
 
 watch(periods, () => {

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas import ClusterIn, CollisionIn, EchoIn, MomentumIn, NeighborIn, RepeatIn, RoadIn, SpanIn
+from ..schemas import ClusterIn, CollisionIn, EchoIn, MomentumIn, NeighborIn, RepeatIn, RoadIn, SpanIn, SumIn
 from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
 from ..services.collision import collide, collide_records
@@ -12,6 +12,7 @@ from ..services.repeat import repeat_pulse, score_repeat
 from ..services.cluster import cluster_summary, score_cluster
 from ..services.road import road_summary, score_road
 from ..services.span import score_span, span_summary
+from ..services.sum_pulse import score_sum, sum_summary
 from ..services.shape import shape_stats
 from ..services.seed import ensure_seed
 from ..lotteries import normalize_type
@@ -217,6 +218,44 @@ def post_road(lottery_type: str, body: RoadIn, db: Session = Depends(get_db)):
     ensure_seed(db)
     try:
         return score_road(
+            db,
+            normalize_type(lottery_type),
+            body.main,
+            body.special,
+            limit=body.limit,
+            short=body.short,
+            long=body.long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/{lottery_type}/sum")
+def get_sum(
+    lottery_type: str,
+    limit: int = Query(80, ge=5, le=200),
+    short: int = Query(10, ge=5, le=30),
+    long: int = Query(50, ge=20, le=200),
+    db: Session = Depends(get_db),
+):
+    ensure_seed(db)
+    try:
+        return sum_summary(
+            db,
+            normalize_type(lottery_type),
+            limit=limit,
+            short=short,
+            long=long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/{lottery_type}/sum/score")
+def post_sum(lottery_type: str, body: SumIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    try:
+        return score_sum(
             db,
             normalize_type(lottery_type),
             body.main,

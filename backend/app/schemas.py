@@ -111,6 +111,14 @@ class RoadIn(BaseModel):
     long: int = Field(default=50, ge=20, le=200)
 
 
+class SumIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    short: int = Field(default=10, ge=5, le=30)
+    long: int = Field(default=50, ge=20, le=200)
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None
