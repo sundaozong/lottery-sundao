@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量</p>
       </div>
     </div>
 
@@ -584,6 +584,224 @@
       </div>
     </div>
 
+    <div class="mb-4">
+      <div class="section-head">
+        <span>冷热动量</span>
+        <span class="sub">短窗对比长窗 · 升温与降温 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ momentum?.disclaimer || '冷热动量比较短窗口和长窗口的出现率，看号码是在升温还是降温，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="momentumShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="momentumLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="momentumMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="momentumSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="momentumBoardLoading" @click="loadMomentum">
+            <AppIcon v-if="momentumBoardLoading" name="sync" :size="14" class="spin" />
+            {{ momentumBoardLoading ? '统计中…' : '刷新动量' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="momentumLoading" @click="runMomentum">
+            <AppIcon v-if="momentumLoading" name="sync" :size="14" class="spin" />
+            {{ momentumLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="momentumLoading" @click="fillLatestMomentum">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ momentumHint }}</p>
+        <p v-if="momentumError" class="bet-error">{{ momentumError }}</p>
+
+        <div v-if="momentumBoardLoading && !momentum" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计动量…
+        </div>
+        <div v-else-if="momentum" class="momentum-list">
+          <p class="text-xs text-muted">
+            样本 {{ momentum.sample_size }} 期 · 短窗 {{ momentum.short }} · 长窗 {{ momentum.long }}
+            · 阈值 {{ momentumThreshold }} · 升温 {{ momentumRisingCount }} · 降温 {{ momentumFallingCount }}
+          </p>
+          <div v-if="!momentum.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会比较短窗和长窗的出现率。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+          <template v-if="momentum.mode === 'digit'">
+            <div v-for="pos in momentum.positions" :key="pos.index" class="momentum-pos">
+              <div class="card-title">{{ pos.label }}
+                <span class="sub">升温 {{ pos.rising.length }} · 降温 {{ pos.falling.length }} · 持平 {{ pos.flat.length }}</span>
+              </div>
+              <div v-if="!pos.rising.length && !pos.falling.length" class="text-xs text-muted">这个位置没有明显升降</div>
+              <template v-else>
+                <div v-if="pos.rising.length" class="momentum-band">
+                  <span class="momentum-tag">升温</span>
+                  <div class="balls">
+                    <span
+                      v-for="n in pos.rising"
+                      :key="pos.index + '-r-' + n"
+                      class="ball sm rising"
+                      :class="ballClass(type)"
+                      :title="momentumTip(momentumStat(pos.numbers, n))"
+                    >{{ n }}</span>
+                  </div>
+                </div>
+                <div v-if="pos.falling.length" class="momentum-band">
+                  <span class="momentum-tag">降温</span>
+                  <div class="balls">
+                    <span
+                      v-for="n in pos.falling"
+                      :key="pos.index + '-f-' + n"
+                      class="ball ghost sm"
+                      :title="momentumTip(momentumStat(pos.numbers, n))"
+                    >{{ n }}</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template v-else>
+            <div class="card-title">主号 <span class="sub">持平 {{ momentum.flat.length }} 个，不逐个展开</span></div>
+            <div v-if="!momentum.rising.length && !momentum.falling.length" class="text-xs text-muted">这窗里没有明显升降</div>
+            <template v-else>
+              <div v-if="momentum.rising.length" class="momentum-band">
+                <span class="momentum-tag">升温</span>
+                <div class="balls">
+                  <span
+                    v-for="n in momentum.rising"
+                    :key="'mr' + n"
+                    class="ball sm rising"
+                    :class="ballClass(type)"
+                    :title="momentumTip(momentumStat(momentum.numbers, n))"
+                  >{{ n }}</span>
+                </div>
+              </div>
+              <div v-if="momentum.falling.length" class="momentum-band">
+                <span class="momentum-tag">降温</span>
+                <div class="balls">
+                  <span
+                    v-for="n in momentum.falling"
+                    :key="'mf' + n"
+                    class="ball ghost sm"
+                    :title="momentumTip(momentumStat(momentum.numbers, n))"
+                  >{{ n }}</span>
+                </div>
+              </div>
+            </template>
+          </template>
+
+          <div v-if="momentum.special" class="momentum-pos">
+            <div class="card-title">{{ momentum.special.label }} <span class="sub">单独统计，不计入主号动量</span></div>
+            <div v-if="!momentum.special.rising.length && !momentum.special.falling.length" class="text-xs text-muted">特别号没有明显升降</div>
+            <template v-else>
+              <div v-if="momentum.special.rising.length" class="momentum-band">
+                <span class="momentum-tag">升温</span>
+                <div class="balls">
+                  <span
+                    v-for="n in momentum.special.rising"
+                    :key="'spr' + n"
+                    class="ball sm rising"
+                    :class="ballClass(type, 'special')"
+                    :title="momentumTip(momentumStat(momentum.special.numbers, n))"
+                  >{{ n }}</span>
+                </div>
+              </div>
+              <div v-if="momentum.special.falling.length" class="momentum-band">
+                <span class="momentum-tag">降温</span>
+                <div class="balls">
+                  <span
+                    v-for="n in momentum.special.falling"
+                    :key="'spf' + n"
+                    class="ball ghost sm"
+                    :title="momentumTip(momentumStat(momentum.special.numbers, n))"
+                  >{{ n }}</span>
+                </div>
+              </div>
+            </template>
+          </div>
+          </template>
+
+          <div v-if="momentumScore" class="momentum-score">
+            <div class="card-title">这注的动量</div>
+            <p class="text-xs text-muted">{{ momentumScoreText }}</p>
+            <div class="momentum-band">
+              <span class="momentum-tag">升温</span>
+              <div class="balls">
+                <span
+                  v-for="(item, index) in momentumScore.ticket.rising"
+                  :key="momentumMemberKey(item, index)"
+                  class="pos-group"
+                >
+                  <span v-if="momentumMemberTitle(item)" class="pos-label">{{ momentumMemberTitle(item) }}</span>
+                  <span class="ball sm rising" :class="ballClass(type)">{{ momentumMemberLabel(item) }}</span>
+                </span>
+                <span v-if="!momentumScore.ticket.rising.length" class="text-xs text-muted">没有</span>
+              </div>
+            </div>
+            <div class="momentum-band">
+              <span class="momentum-tag">降温</span>
+              <div class="balls">
+                <span
+                  v-for="(item, index) in momentumScore.ticket.falling"
+                  :key="momentumMemberKey(item, index)"
+                  class="pos-group"
+                >
+                  <span v-if="momentumMemberTitle(item)" class="pos-label">{{ momentumMemberTitle(item) }}</span>
+                  <span class="ball ghost sm">{{ momentumMemberLabel(item) }}</span>
+                </span>
+                <span v-if="!momentumScore.ticket.falling.length" class="text-xs text-muted">没有</span>
+              </div>
+            </div>
+            <div class="momentum-band">
+              <span class="momentum-tag">持平</span>
+              <div class="balls">
+                <span
+                  v-for="(item, index) in momentumScore.ticket.flat"
+                  :key="momentumMemberKey(item, index)"
+                  class="pos-group"
+                >
+                  <span v-if="momentumMemberTitle(item)" class="pos-label">{{ momentumMemberTitle(item) }}</span>
+                  <span class="ball ghost sm">{{ momentumMemberLabel(item) }}</span>
+                </span>
+                <span v-if="!momentumScore.ticket.flat.length" class="text-xs text-muted">没有</span>
+              </div>
+            </div>
+            <div v-if="momentumSpecialScored" class="momentum-pos">
+              <div class="card-title">{{ momentum.special?.label || '特别号' }} <span class="sub">这注的特别号，不计入主号分</span></div>
+              <div class="momentum-band">
+                <span class="momentum-tag">升温</span>
+                <div class="balls">
+                  <span v-for="n in momentumScore.special_ticket.rising" :key="'sr' + n" class="ball sm rising" :class="ballClass(type, 'special')">{{ n }}</span>
+                  <span v-if="!momentumScore.special_ticket.rising.length" class="text-xs text-muted">没有</span>
+                </div>
+              </div>
+              <div class="momentum-band">
+                <span class="momentum-tag">降温</span>
+                <div class="balls">
+                  <span v-for="n in momentumScore.special_ticket.falling" :key="'sf' + n" class="ball ghost sm">{{ n }}</span>
+                  <span v-if="!momentumScore.special_ticket.falling.length" class="text-xs text-muted">没有</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -752,7 +970,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -849,6 +1067,16 @@ const repeatLoading = ref(false)
 const repeatPulseLoading = ref(false)
 let repeatToken = 0
 const REPEAT_LIMIT = 80
+const momentumShort = ref(10)
+const momentumLong = ref(50)
+const momentumMain = ref('')
+const momentumSpecial = ref('')
+const momentum = ref(null)
+const momentumScore = ref(null)
+const momentumError = ref('')
+const momentumLoading = ref(false)
+const momentumBoardLoading = ref(false)
+let momentumToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -872,6 +1100,45 @@ const repeatHint = computed(() => (
     ? '同一位置数字相同才算重号，顺序不能打乱。仅供娱乐，不构成投注建议。'
     : '主号看和上一期重了几个，特别号单独算，不计入重号。仅供娱乐，不构成投注建议。'
 ))
+const momentumHint = computed(() => (
+  echoField.value.digit
+    ? '按位置比较短窗和长窗出现率。差达到 2% 算升温，低到 -2% 算降温。特别号单独看。仅供娱乐，不构成投注建议。'
+    : '短窗出现率减去长窗出现率。差达到 2% 算升温，低到 -2% 算降温。特别号单独看，不计入主号。仅供娱乐，不构成投注建议。'
+))
+const momentumThreshold = computed(() => {
+  const value = Number(momentum.value?.threshold)
+  if (!Number.isFinite(value)) return '2%'
+  return `${Math.round(value * 1000) / 10}%`
+})
+const momentumRisingCount = computed(() => {
+  const body = momentum.value
+  if (!body) return 0
+  if (body.mode === 'digit') return (body.positions || []).reduce((sum, pos) => sum + (pos.rising || []).length, 0)
+  return (body.rising || []).length
+})
+const momentumFallingCount = computed(() => {
+  const body = momentum.value
+  if (!body) return 0
+  if (body.mode === 'digit') return (body.positions || []).reduce((sum, pos) => sum + (pos.falling || []).length, 0)
+  return (body.falling || []).length
+})
+const momentumScoreText = computed(() => {
+  const score = momentumScore.value
+  if (!score?.ticket) return ''
+  const ticket = score.ticket
+  let text = `主号升温 ${ticket.rising_count}、降温 ${ticket.falling_count}、持平 ${ticket.flat_count}，动量分 ${ticket.score}`
+  const special = score.special_ticket
+  const specialCount = (special?.rising_count || 0) + (special?.falling_count || 0) + (special?.flat_count || 0)
+  if (specialCount) {
+    text += `。特别号升温 ${special.rising_count}、降温 ${special.falling_count}、持平 ${special.flat_count}，不计入主号分`
+  }
+  return `${text}。仅供娱乐，不构成投注建议。`
+})
+const momentumSpecialScored = computed(() => {
+  const special = momentumScore.value?.special_ticket
+  if (!special) return false
+  return (special.rising_count || 0) + (special.falling_count || 0) + (special.flat_count || 0) > 0
+})
 const repeatRecent = computed(() => (repeatPulse.value?.recent_pairs || []).slice(0, 8))
 const repeatSummary = computed(() => {
   const score = repeatScore.value
@@ -1238,6 +1505,95 @@ async function runRepeat() {
   }
 }
 
+function momentumWindows() {
+  let short = Math.round(Number(momentumShort.value))
+  let long = Math.round(Number(momentumLong.value))
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  momentumShort.value = short
+  momentumLong.value = long
+  return { limit: 80, short, long }
+}
+
+function momentumStat(rows, number) {
+  return (rows || []).find((item) => item.number === String(number))
+}
+
+function momentumTip(row) {
+  if (!row) return ''
+  const sign = row.delta > 0 ? '+' : ''
+  const pct = (value) => `${(Number(value) * 100).toFixed(1)}%`
+  return `短窗 ${pct(row.rate_short)} · 长窗 ${pct(row.rate_long)} · 差 ${sign}${row.delta}`
+}
+
+function momentumMemberLabel(item) {
+  return item && typeof item === 'object' ? item.number : item
+}
+
+function momentumMemberTitle(item) {
+  return item && typeof item === 'object' ? item.label : ''
+}
+
+function momentumMemberKey(item, index) {
+  if (item && typeof item === 'object') return `${item.index}-${item.number}`
+  return `${index}-${item}`
+}
+
+async function loadMomentum() {
+  const token = ++momentumToken
+  momentumBoardLoading.value = true
+  const windows = momentumWindows()
+  try {
+    const body = await getMomentum(type.value, windows)
+    if (token !== momentumToken) return
+    momentum.value = body
+    momentumScore.value = null
+    momentumError.value = ''
+  } catch (e) {
+    if (token !== momentumToken) return
+    momentum.value = null
+    momentumScore.value = null
+    momentumError.value = e.message || '动量加载失败'
+  } finally {
+    if (token === momentumToken) momentumBoardLoading.value = false
+  }
+}
+
+async function runMomentum() {
+  momentumLoading.value = true
+  momentumError.value = ''
+  const windows = momentumWindows()
+  try {
+    const main = splitNums(momentumMain.value)
+    const special = echoField.value.specialLabel ? splitNums(momentumSpecial.value) : []
+    const body = await postMomentum(type.value, { main, special, ...windows })
+    momentum.value = body
+    momentumScore.value = body
+  } catch (e) {
+    momentumScore.value = null
+    momentumError.value = e.message || '打分失败'
+  } finally {
+    momentumLoading.value = false
+  }
+}
+
+async function fillLatestMomentum() {
+  momentumError.value = ''
+  if (!momentum.value) await loadMomentum()
+  const latest = momentum.value?.latest_draw
+  if (!latest) {
+    momentumScore.value = null
+    momentumError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  momentumMain.value = (latest.main || []).join(' ')
+  momentumSpecial.value = (latest.special || []).join(' ')
+  await runMomentum()
+}
+
 async function fillLatestRepeat() {
   repeatError.value = ''
   if (!repeatPulse.value) await loadRepeat()
@@ -1309,10 +1665,18 @@ function load() {
   repeatError.value = ''
   repeatMain.value = ''
   repeatSpecial.value = ''
+  momentum.value = null
+  momentumScore.value = null
+  momentumError.value = ''
+  momentumMain.value = ''
+  momentumSpecial.value = ''
+  momentumShort.value = 10
+  momentumLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
   loadRepeat()
+  loadMomentum()
 }
 
 watch(periods, () => {

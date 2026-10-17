@@ -30,6 +30,15 @@ export const api = {
   collision: (type, body) => request(`/api/analysis/${type}/collision`, { method: 'POST', body: JSON.stringify(body) }),
   repeat: (type, limit = 80) => request(`/api/analysis/${type}/repeat?limit=${limit}`),
   repeatScore: (type, body) => request(`/api/analysis/${type}/repeat`, { method: 'POST', body: JSON.stringify(body) }),
+  momentum: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/momentum?${params}`)
+  },
+  momentumScore: (type, body) => request(`/api/analysis/${type}/momentum`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -45,6 +54,14 @@ export const api = {
   mailTest: (to) => request('/api/mail/test', { method: 'POST', body: JSON.stringify({ to }) }),
   mailDigest: () => request('/api/mail/digest', { method: 'POST' }),
   mailPredict: (body) => request('/api/mail/predict', { method: 'POST', body: JSON.stringify(body) }),
+}
+
+export function getMomentum(type, params) {
+  return api.momentum(type, params)
+}
+
+export function postMomentum(type, body) {
+  return api.momentumScore(type, body)
 }
 
 export async function downloadRecords() {
