@@ -22,7 +22,7 @@ from app.services.pulse_ensemble import (
     score_ticket,
 )
 
-INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime"}
+INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone"}
 
 
 def _draw(db, lottery_type, issue, main, special=None):
@@ -56,7 +56,7 @@ def _seed_dlt(db, count=10):
 
 def test_registry_uses_existing_ticket_scorers_and_skips_modules_without_one():
     keys = [item.key for item in PULSE_MODULES]
-    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime"]
+    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone"]
     assert len(keys) == len(set(keys))
     skipped = {item["module"]: item["reason"] for item in SKIPPED_MODULES}
     assert {"collision", "echo", "affinity"} <= set(skipped)
@@ -346,6 +346,11 @@ def test_score_ticket_calls_registered_modules(db):
     assert prime["label"] == "质合"
     assert prime["score"] is not None
     assert "质数" in prime["note"]
+    zone = next(item for item in scored["breakdown"] if item["module"] == "zone")
+    assert zone["label"] == "区位"
+    assert zone["weight"] == 1.0
+    assert zone["score"] is not None
+    assert "区位" in zone["note"]
 
 
 def test_existing_strategies_do_not_gain_pulse_fields(db):
@@ -408,6 +413,9 @@ def test_openapi_documents_pulse_strategy(client):
     description = schema["properties"]["strategy"]["description"]
     assert "pulse" in description
     assert "脉动综合" in description
+    weights = schema["properties"]["weights"]["description"]
+    assert "zone" in weights
     post = spec.json()["paths"]["/api/predict"]["post"]
     text = f"{post.get('summary', '')} {post.get('description', '')}"
     assert "pulse" in text or "脉动" in text
+    assert "区位" in text

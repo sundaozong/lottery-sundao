@@ -135,6 +135,14 @@ class PrimeIn(BaseModel):
     long: int = Field(default=50, ge=20, le=200)
 
 
+class ZoneIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    short: int = Field(default=10, ge=5, le=30)
+    long: int = Field(default=50, ge=20, le=200)
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None
@@ -154,7 +162,7 @@ class PredictIn(BaseModel):
     count: int = Field(default=1, ge=1, le=10)
     weights: Optional[dict[str, float]] = Field(
         default=None,
-        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime。",
+        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone。",
     )
 
 

@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位</p>
       </div>
     </div>
 
@@ -1897,6 +1897,172 @@
       </div>
     </div>
 
+    <div class="mb-4" id="zone-pulse">
+      <div class="section-head">
+        <span>区位脉动</span>
+        <span class="sub">短窗对比长窗 · 三区比更偏与更匀 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ zone?.disclaimer || '区位脉动看主号三区个数配比和区位偏度，以及短窗相对长窗是更偏还是更匀，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="zoneLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="zoneShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="zoneLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="zoneMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="zoneSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="zoneBoardLoading" @click="loadZone">
+            <AppIcon v-if="zoneBoardLoading" name="sync" :size="14" class="spin" />
+            {{ zoneBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="zoneLoading" @click="runZone">
+            <AppIcon v-if="zoneLoading" name="sync" :size="14" class="spin" />
+            {{ zoneLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="zoneLoading" @click="fillLatestZone">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ zoneHint }}</p>
+        <p v-if="zoneError" class="bet-error">{{ zoneError }}</p>
+
+        <div v-if="zoneBoardLoading && !zone" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计区位…
+        </div>
+        <div v-else-if="zone" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ zone.sample_size }} 期 · 平均 {{ spanStat(zone.mean) }} · 中位 {{ spanStat(zone.median) }}
+            · 短窗 {{ spanStat(zone.short_avg) }} · 长窗 {{ spanStat(zone.long_avg) }} · 脉动 {{ spanSigned(zone.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(zone.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ zone.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="zone.drift || 'flat'">{{ zoneDriftLabel(zone.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(zone.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ zone.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="zone.avg_zone_counts" class="road-mix">
+            <div v-for="item in zone.zones" :key="item.key" class="road-mix-item">
+              <span class="road-mix-label">{{ zoneRangeText(item, zone.zones) }}</span>
+              <span class="road-mix-num">{{ spanStat(zone.avg_zone_counts[item.key]) }}</span>
+            </div>
+          </div>
+          <div v-if="zone.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ zone.latest_draw.issue }} 期</span>
+                <span>三区比 {{ zone.latest_draw.ratio }} · 偏度 {{ zone.latest_draw.imbalance }}</span>
+              </div>
+              <NumberBalls :numbers="zone.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!zone.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看三区各有几个，以及短窗相对长窗是更偏还是更匀。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              区位偏度
+              <span class="sub">{{ zone.basis === 'digits' ? '整注各位按 0–3、4–6、7–9，0 和 9 不绕圈' : '主号去重后按数值区间分成三区' }}，偏度是最多一区减去最少一区，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in zoneBars" :key="bucket.imbalance" class="span-bar" :class="{ 'is-current': zoneCurrent(bucket.imbalance) }">
+                <span class="mono">{{ bucket.imbalance }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, zone.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <p v-if="zoneBarsCollapsed" class="text-xs text-muted">区位偏度拉得比较开，这里只展开出现过的档。</p>
+            <div v-if="zone.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in zone.common" :key="'c' + item.ratio" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="span-meta">{{ item.ratio }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="zone.special" class="span-pos">
+              <div class="card-title">{{ zone.special.label }} <span class="sub">有特别号就另分三区，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ zone.special.sample_size }} 期 · 短窗 {{ spanStat(zone.special.short_avg) }} · 长窗 {{ spanStat(zone.special.long_avg) }}
+                · {{ zoneDriftLabel(zone.special.drift) }}
+              </p>
+              <div v-if="zone.special.avg_zone_counts" class="road-mix">
+                <div v-for="item in zone.special.zones" :key="'s' + item.key" class="road-mix-item">
+                  <span class="road-mix-label">{{ zoneRangeText(item, zone.special.zones) }}</span>
+                  <span class="road-mix-num">{{ spanStat(zone.special.avg_zone_counts[item.key]) }}</span>
+                </div>
+              </div>
+              <div class="span-bars">
+                <div v-for="bucket in zoneSpecialBars" :key="'s' + bucket.imbalance" class="span-bar">
+                  <span class="mono">{{ bucket.imbalance }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, zone.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="zoneScore" class="span-score">
+            <div class="card-title">这注的区位</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(zoneScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(zoneScore.ticket.alignment) }}</span>
+                  <span v-if="zoneScore.ticket.ratio">三区比 {{ zoneScore.ticket.ratio }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ zoneScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ zoneScore.ticket.imbalance }}</div>
+                <div class="text-xs text-muted">区位偏度</div>
+              </div>
+            </div>
+            <div v-if="zoneSpecialScored" class="span-pos">
+              <div class="card-title">{{ zone.special?.label || '特别号' }} <span class="sub">这注的特别号区位，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ zoneScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ zoneScore.special_ticket.imbalance }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(zoneScore.special_ticket.rarity) }} · {{ zoneScore.special_ticket.ratio }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -2065,7 +2231,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -2248,6 +2414,17 @@ const primeError = ref('')
 const primeLoading = ref(false)
 const primeBoardLoading = ref(false)
 let primeToken = 0
+const zoneLimit = ref(80)
+const zoneShort = ref(10)
+const zoneLong = ref(50)
+const zoneMain = ref('')
+const zoneSpecial = ref('')
+const zone = ref(null)
+const zoneScore = ref(null)
+const zoneError = ref('')
+const zoneLoading = ref(false)
+const zoneBoardLoading = ref(false)
+let zoneToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -2378,6 +2555,18 @@ const primeBarsCollapsed = computed(() => {
 })
 const primeSpecialBars = computed(() => pulseVisibleBars(prime.value?.special?.distribution, 'prime_count'))
 const primeSpecialScored = computed(() => primeScore.value?.special_ticket?.prime_count != null)
+const zoneHint = computed(() => (
+  echoField.value.digit
+    ? '整注各位数字分成低区 0–3、中区 4–6、高区 7–9，0 和 9 不绕圈。区位偏度是最多的一区减去最少的一区。特别号不计入主号。短窗平均比长窗高出 0.5 算更偏。仅供娱乐，不构成投注建议。'
+    : '主号去重后按数值区间分成三区，不是除以 3 的余数。特别号不并进去，有特别号时按它自己的区间另看。区位偏度是最多的一区减去最少的一区。短窗平均比长窗高出 0.5 算更偏。仅供娱乐，不构成投注建议。'
+))
+const zoneBars = computed(() => pulseVisibleBars(zone.value?.distribution, 'imbalance'))
+const zoneBarsCollapsed = computed(() => {
+  const rows = zone.value?.distribution || []
+  return zoneBars.value.length < rows.length
+})
+const zoneSpecialBars = computed(() => pulseVisibleBars(zone.value?.special?.distribution, 'imbalance'))
+const zoneSpecialScored = computed(() => zoneScore.value?.special_ticket?.imbalance != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -3423,6 +3612,93 @@ async function runPrime() {
   }
 }
 
+function zoneWindows() {
+  let limit = Math.round(Number(zoneLimit.value))
+  let short = Math.round(Number(zoneShort.value))
+  let long = Math.round(Number(zoneLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  zoneLimit.value = limit
+  zoneShort.value = short
+  zoneLong.value = long
+  return { limit, short, long }
+}
+
+function zoneDriftLabel(drift) {
+  if (drift === 'rising') return '更偏'
+  if (drift === 'falling') return '更匀'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function zoneRangeText(item, zones) {
+  if (!item) return ''
+  const pad = (zones || [item]).some((zone) => zone.lo > 9 || zone.hi > 9)
+  const text = (value) => (pad ? String(value).padStart(2, '0') : String(value))
+  return `${item.name} ${text(item.lo)}–${text(item.hi)}`
+}
+
+function zoneCurrent(value) {
+  return zoneScore.value?.ticket?.imbalance === value
+}
+
+async function loadZone() {
+  const token = ++zoneToken
+  zoneBoardLoading.value = true
+  const params = zoneWindows()
+  try {
+    const body = await getZone(type.value, params)
+    if (token !== zoneToken) return
+    zone.value = body
+    zoneScore.value = null
+    zoneError.value = ''
+  } catch (e) {
+    if (token !== zoneToken) return
+    zone.value = null
+    zoneScore.value = null
+    zoneError.value = e.message || '区位加载失败'
+  } finally {
+    if (token === zoneToken) zoneBoardLoading.value = false
+  }
+}
+
+async function runZone() {
+  zoneLoading.value = true
+  zoneError.value = ''
+  const params = zoneWindows()
+  try {
+    const main = splitNums(zoneMain.value)
+    const special = echoField.value.specialLabel ? splitNums(zoneSpecial.value) : []
+    const body = await postZone(type.value, { main, special, ...params })
+    zone.value = body
+    zoneScore.value = body
+  } catch (e) {
+    zoneScore.value = null
+    zoneError.value = e.message || '打分失败'
+  } finally {
+    zoneLoading.value = false
+  }
+}
+
+async function fillLatestZone() {
+  zoneError.value = ''
+  if (!zone.value) await loadZone()
+  const latest = zone.value?.latest_draw
+  if (!latest) {
+    zoneScore.value = null
+    zoneError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  zoneMain.value = (latest.main || []).join(' ')
+  zoneSpecial.value = (latest.special || []).join(' ')
+  await runZone()
+}
+
 async function fillLatestPrime() {
   primeError.value = ''
   if (!prime.value) await loadPrime()
@@ -3640,6 +3916,14 @@ function load() {
   primeLimit.value = 80
   primeShort.value = 10
   primeLong.value = 50
+  zone.value = null
+  zoneScore.value = null
+  zoneError.value = ''
+  zoneMain.value = ''
+  zoneSpecial.value = ''
+  zoneLimit.value = 80
+  zoneShort.value = 10
+  zoneLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -3652,6 +3936,7 @@ function load() {
   loadSum()
   loadParity()
   loadPrime()
+  loadZone()
 }
 
 watch(periods, () => {
