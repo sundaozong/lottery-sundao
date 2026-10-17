@@ -24,6 +24,7 @@ from .echo import PROFILES
 from .momentum import score_momentum
 from .neighbor import score_neighbor
 from .parity import score_parity
+from .prime import score_prime
 from .predict import DISCLAIMER
 from .repeat import score_repeat
 from .road import score_road
@@ -62,6 +63,7 @@ _MEMO_TARGETS = (
     ("app.services.road", "road_summary"),
     ("app.services.sum_pulse", "sum_summary"),
     ("app.services.parity", "parity_summary"),
+    ("app.services.prime", "prime_summary"),
 )
 
 
@@ -81,6 +83,7 @@ PULSE_MODULES = [
     PulseModule("road", "012路", score_road),
     PulseModule("sum", "和值", score_sum),
     PulseModule("parity", "奇偶", score_parity),
+    PulseModule("prime", "质合", score_prime),
 ]
 
 

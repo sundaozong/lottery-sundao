@@ -22,7 +22,7 @@ from app.services.pulse_ensemble import (
     score_ticket,
 )
 
-INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity"}
+INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime"}
 
 
 def _draw(db, lottery_type, issue, main, special=None):
@@ -56,7 +56,7 @@ def _seed_dlt(db, count=10):
 
 def test_registry_uses_existing_ticket_scorers_and_skips_modules_without_one():
     keys = [item.key for item in PULSE_MODULES]
-    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity"]
+    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime"]
     assert len(keys) == len(set(keys))
     skipped = {item["module"]: item["reason"] for item in SKIPPED_MODULES}
     assert {"collision", "echo", "affinity"} <= set(skipped)
@@ -342,6 +342,10 @@ def test_score_ticket_calls_registered_modules(db):
     assert parity["label"] == "奇偶"
     assert parity["score"] is not None
     assert "奇数" in parity["note"]
+    prime = next(item for item in scored["breakdown"] if item["module"] == "prime")
+    assert prime["label"] == "质合"
+    assert prime["score"] is not None
+    assert "质数" in prime["note"]
 
 
 def test_existing_strategies_do_not_gain_pulse_fields(db):
