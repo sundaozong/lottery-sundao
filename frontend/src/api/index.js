@@ -65,6 +65,15 @@ export const api = {
     return request(`/api/analysis/${type}/cluster?${params}`)
   },
   clusterScore: (type, body) => request(`/api/analysis/${type}/cluster`, { method: 'POST', body: JSON.stringify(body) }),
+  road: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/road?${params}`)
+  },
+  roadScore: (type, body) => request(`/api/analysis/${type}/road`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -112,6 +121,14 @@ export function getCluster(type, params) {
 
 export function postCluster(type, body) {
   return api.clusterScore(type, body)
+}
+
+export function getRoad(type, params) {
+  return api.road(type, params)
+}
+
+export function postRoad(type, body) {
+  return api.roadScore(type, body)
 }
 
 export async function downloadRecords() {
