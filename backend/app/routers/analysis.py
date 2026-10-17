@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas import CollisionIn, EchoIn, MomentumIn, NeighborIn, RepeatIn, SpanIn
+from ..schemas import ClusterIn, CollisionIn, EchoIn, MomentumIn, NeighborIn, RepeatIn, SpanIn
 from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
 from ..services.collision import collide, collide_records
@@ -9,6 +9,7 @@ from ..services.echo import find_echoes
 from ..services.momentum import momentum_summary, score_momentum
 from ..services.neighbor import neighbor_summary, score_neighbor
 from ..services.repeat import repeat_pulse, score_repeat
+from ..services.cluster import cluster_summary, score_cluster
 from ..services.span import score_span, span_summary
 from ..services.shape import shape_stats
 from ..services.seed import ensure_seed
@@ -139,6 +140,44 @@ def post_span(lottery_type: str, body: SpanIn, db: Session = Depends(get_db)):
     ensure_seed(db)
     try:
         return score_span(
+            db,
+            normalize_type(lottery_type),
+            body.main,
+            body.special,
+            limit=body.limit,
+            short=body.short,
+            long=body.long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/{lottery_type}/cluster")
+def get_cluster(
+    lottery_type: str,
+    limit: int = Query(80, ge=5, le=200),
+    short: int = Query(10, ge=5, le=30),
+    long: int = Query(50, ge=20, le=200),
+    db: Session = Depends(get_db),
+):
+    ensure_seed(db)
+    try:
+        return cluster_summary(
+            db,
+            normalize_type(lottery_type),
+            limit=limit,
+            short=short,
+            long=long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/{lottery_type}/cluster")
+def post_cluster(lottery_type: str, body: ClusterIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    try:
+        return score_cluster(
             db,
             normalize_type(lottery_type),
             body.main,
