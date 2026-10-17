@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路</p>
       </div>
     </div>
 
@@ -1268,6 +1268,172 @@
       </div>
     </div>
 
+    <div class="mb-4">
+      <div class="section-head">
+        <span>012路脉动</span>
+        <span class="sub">短窗对比长窗 · 更偏与更匀 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ road?.disclaimer || '012路脉动看主号除以 3 的余数配比和路偏度，以及短窗相对长窗是更偏还是更匀，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="roadLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="roadShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="roadLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="roadMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="roadSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="roadBoardLoading" @click="loadRoad">
+            <AppIcon v-if="roadBoardLoading" name="sync" :size="14" class="spin" />
+            {{ roadBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="roadLoading" @click="runRoad">
+            <AppIcon v-if="roadLoading" name="sync" :size="14" class="spin" />
+            {{ roadLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="roadLoading" @click="fillLatestRoad">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ roadHint }}</p>
+        <p v-if="roadError" class="bet-error">{{ roadError }}</p>
+
+        <div v-if="roadBoardLoading && !road" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计012路…
+        </div>
+        <div v-else-if="road" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ road.sample_size }} 期 · 平均 {{ spanStat(road.mean) }} · 中位 {{ spanStat(road.median) }}
+            · 短窗 {{ spanStat(road.short_avg) }} · 长窗 {{ spanStat(road.long_avg) }} · 脉动 {{ spanSigned(road.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(road.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ road.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="road.drift || 'flat'">{{ roadDriftLabel(road.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(road.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ road.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="road.avg_road_counts" class="road-mix">
+            <div v-for="name in ['0', '1', '2']" :key="name" class="road-mix-item">
+              <span class="road-mix-label">{{ name }}路</span>
+              <span class="road-mix-num">{{ spanStat(road.avg_road_counts[name]) }}</span>
+            </div>
+          </div>
+          <div v-if="road.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ road.latest_draw.issue }} 期</span>
+                <span>路偏度 {{ road.latest_draw.imbalance }} · {{ roadCountText(road.latest_draw.counts) }}</span>
+              </div>
+              <NumberBalls :numbers="road.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!road.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看 0路、1路、2路各有几个，以及短窗相对长窗是更偏还是更匀。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              路偏度分布
+              <span class="sub">{{ road.basis === 'digits' ? '整注各位除以 3 的余数，0 和 9 不绕圈' : '主号去重后按除以 3 的余数' }}，偏度是最多一路减去最少一路，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in roadBars" :key="bucket.imbalance" class="span-bar" :class="{ 'is-current': roadCurrent(bucket.imbalance) }">
+                <span class="mono">{{ bucket.imbalance }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, road.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <p v-if="roadBarsCollapsed" class="text-xs text-muted">路偏度拉得比较开，这里只展开出现过的档。</p>
+            <div v-if="road.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in road.common" :key="'c' + item.imbalance" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="ball sm" :class="ballClass(type)">{{ item.imbalance }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="road.special" class="span-pos">
+              <div class="card-title">{{ road.special.label }} <span class="sub">有特别号就另计路，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ road.special.sample_size }} 期 · 短窗 {{ spanStat(road.special.short_avg) }} · 长窗 {{ spanStat(road.special.long_avg) }}
+                · {{ roadDriftLabel(road.special.drift) }}
+              </p>
+              <div v-if="road.special.avg_road_counts" class="road-mix">
+                <div v-for="name in ['0', '1', '2']" :key="'s' + name" class="road-mix-item">
+                  <span class="road-mix-label">{{ name }}路</span>
+                  <span class="road-mix-num">{{ spanStat(road.special.avg_road_counts[name]) }}</span>
+                </div>
+              </div>
+              <div class="span-bars">
+                <div v-for="bucket in roadSpecialBars" :key="'s' + bucket.imbalance" class="span-bar">
+                  <span class="mono">{{ bucket.imbalance }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, road.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="roadScore" class="span-score">
+            <div class="card-title">这注的012路</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(roadScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(roadScore.ticket.alignment) }}</span>
+                  <span>{{ roadCountText(roadScore.ticket.counts) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ roadScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ roadScore.ticket.imbalance }}</div>
+                <div class="text-xs text-muted">路偏度</div>
+              </div>
+            </div>
+            <div v-if="roadSpecialScored" class="span-pos">
+              <div class="card-title">{{ road.special?.label || '特别号' }} <span class="sub">这注的特别号路，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ roadScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ roadScore.special_ticket.imbalance }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(roadScore.special_ticket.rarity) }} · {{ roadCountText(roadScore.special_ticket.counts) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -1436,7 +1602,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -1575,6 +1741,17 @@ const clusterError = ref('')
 const clusterLoading = ref(false)
 const clusterBoardLoading = ref(false)
 let clusterToken = 0
+const roadLimit = ref(80)
+const roadShort = ref(10)
+const roadLong = ref(50)
+const roadMain = ref('')
+const roadSpecial = ref('')
+const road = ref(null)
+const roadScore = ref(null)
+const roadError = ref('')
+const roadLoading = ref(false)
+const roadBoardLoading = ref(false)
+let roadToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -1657,6 +1834,18 @@ const clusterBarsCollapsed = computed(() => {
 const clusterCountBars = computed(() => pulseVisibleBars(cluster.value?.cluster_counts?.distribution, 'clusters'))
 const clusterSpecialBars = computed(() => pulseVisibleBars(cluster.value?.special?.distribution, 'max_len'))
 const clusterSpecialScored = computed(() => clusterScore.value?.special_ticket?.max_len != null)
+const roadHint = computed(() => (
+  echoField.value.digit
+    ? '整注各位数字除以 3 的余数是 0路、1路或 2路，0 和 9 不绕圈。路偏度是最多的一路减去最少的一路。特别号不计入主号。短窗平均比长窗高出 0.5 算更偏。仅供娱乐，不构成投注建议。'
+    : '主号去重后按除以 3 的余数分成 0路、1路、2路，特别号不并进去。有特别号时另看它们的路。路偏度是最多的一路减去最少的一路。短窗平均比长窗高出 0.5 算更偏。仅供娱乐，不构成投注建议。'
+))
+const roadBars = computed(() => pulseVisibleBars(road.value?.distribution, 'imbalance'))
+const roadBarsCollapsed = computed(() => {
+  const rows = road.value?.distribution || []
+  return roadBars.value.length < rows.length
+})
+const roadSpecialBars = computed(() => pulseVisibleBars(road.value?.special?.distribution, 'imbalance'))
+const roadSpecialScored = computed(() => roadScore.value?.special_ticket?.imbalance != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -2412,6 +2601,91 @@ async function runCluster() {
   }
 }
 
+function roadWindows() {
+  let limit = Math.round(Number(roadLimit.value))
+  let short = Math.round(Number(roadShort.value))
+  let long = Math.round(Number(roadLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  roadLimit.value = limit
+  roadShort.value = short
+  roadLong.value = long
+  return { limit, short, long }
+}
+
+function roadDriftLabel(drift) {
+  if (drift === 'rising') return '更偏'
+  if (drift === 'falling') return '更匀'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function roadCountText(counts) {
+  if (!counts) return ''
+  return `0路 ${counts['0'] ?? 0} · 1路 ${counts['1'] ?? 0} · 2路 ${counts['2'] ?? 0}`
+}
+
+function roadCurrent(value) {
+  return roadScore.value?.ticket?.imbalance === value
+}
+
+async function loadRoad() {
+  const token = ++roadToken
+  roadBoardLoading.value = true
+  const params = roadWindows()
+  try {
+    const body = await getRoad(type.value, params)
+    if (token !== roadToken) return
+    road.value = body
+    roadScore.value = null
+    roadError.value = ''
+  } catch (e) {
+    if (token !== roadToken) return
+    road.value = null
+    roadScore.value = null
+    roadError.value = e.message || '012路加载失败'
+  } finally {
+    if (token === roadToken) roadBoardLoading.value = false
+  }
+}
+
+async function runRoad() {
+  roadLoading.value = true
+  roadError.value = ''
+  const params = roadWindows()
+  try {
+    const main = splitNums(roadMain.value)
+    const special = echoField.value.specialLabel ? splitNums(roadSpecial.value) : []
+    const body = await postRoad(type.value, { main, special, ...params })
+    road.value = body
+    roadScore.value = body
+  } catch (e) {
+    roadScore.value = null
+    roadError.value = e.message || '打分失败'
+  } finally {
+    roadLoading.value = false
+  }
+}
+
+async function fillLatestRoad() {
+  roadError.value = ''
+  if (!road.value) await loadRoad()
+  const latest = road.value?.latest_draw
+  if (!latest) {
+    roadScore.value = null
+    roadError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  roadMain.value = (latest.main || []).join(' ')
+  roadSpecial.value = (latest.special || []).join(' ')
+  await runRoad()
+}
+
 async function fillLatestCluster() {
   clusterError.value = ''
   if (!cluster.value) await loadCluster()
@@ -2569,6 +2843,14 @@ function load() {
   clusterLimit.value = 80
   clusterShort.value = 10
   clusterLong.value = 50
+  road.value = null
+  roadScore.value = null
+  roadError.value = ''
+  roadMain.value = ''
+  roadSpecial.value = ''
+  roadLimit.value = 80
+  roadShort.value = 10
+  roadLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -2577,6 +2859,7 @@ function load() {
   loadNeighbor()
   loadSpan()
   loadCluster()
+  loadRoad()
 }
 
 watch(periods, () => {

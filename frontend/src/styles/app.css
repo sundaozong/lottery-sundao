@@ -954,6 +954,32 @@ button.ball {
 .span-score .span-row { align-items: flex-start; }
 .span-score .echo-draw { flex: 1; min-width: 0; }
 .span-windows { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.road-mix {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.road-mix-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+.road-mix-item:nth-child(1) { border-top: 2px solid var(--accent); }
+.road-mix-item:nth-child(2) { border-top: 2px solid var(--text-secondary); }
+.road-mix-item:nth-child(3) { border-top: 2px solid var(--gold); }
+.road-mix-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.road-mix-num {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
 @media (max-width: 768px) {
   .span-windows { grid-template-columns: 1fr; }
 }
