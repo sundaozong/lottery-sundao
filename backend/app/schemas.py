@@ -139,8 +139,15 @@ class CollisionIn(BaseModel):
 
 class PredictIn(BaseModel):
     lottery_type: str
-    strategy: str = "hot"  # hot | cold | random | hybrid
+    strategy: str = Field(
+        default="hot",
+        description="推荐策略：hot 热号、cold 冷号、hybrid 冷热混合、random 纯随机、pulse 脉动综合。pulse 汇总已有脉动打分，仅供娱乐。",
+    )
     count: int = Field(default=1, ge=1, le=10)
+    weights: Optional[dict[str, float]] = Field(
+        default=None,
+        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity。",
+    )
 
 
 class SettingsOut(BaseModel):

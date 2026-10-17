@@ -105,6 +105,9 @@ def mail_predict(body: MailPredictIn, db: Session = Depends(get_db)):
             main = " ".join(str(x) for x in (rec.get("main") or []))
             special = " ".join(str(x) for x in (rec.get("special") or []))
             text_line = main + (f" + {special}" if special else "")
+            score = rec.get("score")
+            if isinstance(score, (int, float)) and not isinstance(score, bool):
+                text_line += f"  综合 {float(score):.2f}"
         else:
             text_line = str(rec)
         lines.append(f"  方案 {i}: {text_line}")

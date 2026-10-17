@@ -220,6 +220,75 @@
   white-space: nowrap;
   font-weight: 500;
 }
+.predict-row.pulse-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.pulse-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.pulse-top .balls { flex: 1; min-width: 0; }
+.pulse-score {
+  flex: none;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--accent);
+}
+.pulse-rationale {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.pulse-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pulse-chip {
+  padding: 3px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.pulse-chip.high {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+}
+.pulse-chip.mid {
+  color: var(--text);
+}
+.pulse-chip.low {
+  color: var(--text-muted);
+}
+.pulse-detail {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+.pulse-detail summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  width: fit-content;
+}
+.pulse-detail p {
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+.pulse-detail strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-right: 6px;
+}
 
 .prize-hits {
   margin: 14px 0 16px;
