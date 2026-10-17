@@ -101,6 +101,15 @@ export const api = {
     return request(`/api/analysis/${type}/prime?${params}`)
   },
   primeScore: (type, body) => request(`/api/analysis/${type}/prime/score`, { method: 'POST', body: JSON.stringify(body) }),
+  zone: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/zone?${params}`)
+  },
+  zoneScore: (type, body) => request(`/api/analysis/${type}/zone/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -180,6 +189,14 @@ export function getPrime(type, params) {
 
 export function postPrime(type, body) {
   return api.primeScore(type, body)
+}
+
+export function getZone(type, params) {
+  return api.zone(type, params)
+}
+
+export function postZone(type, body) {
+  return api.zoneScore(type, body)
 }
 
 export async function downloadRecords() {
