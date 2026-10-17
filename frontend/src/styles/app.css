@@ -811,3 +811,45 @@ button.ball {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ---------- 邻号牵引 ---------- */
+.neighbor-list { margin-top: 14px; }
+.neighbor-pos { margin-top: 14px; }
+.neighbor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.neighbor-band {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+}
+.neighbor-tag {
+  flex: none;
+  width: 2.4rem;
+  padding-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.neighbor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 8px 0;
+}
+.neighbor-meta {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.neighbor-score { margin-top: 8px; }
+.neighbor-list .ball.hit {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}

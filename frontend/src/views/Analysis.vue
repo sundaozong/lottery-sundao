@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号</p>
       </div>
     </div>
 
@@ -802,6 +802,150 @@
       </div>
     </div>
 
+    <div class="mb-4">
+      <div class="section-head">
+        <span>邻号牵引</span>
+        <span class="sub">开出之后看邻号 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ neighbor?.disclaimer || '邻号牵引看主号开出后，邻号在随后几期是否更常出现，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="neighborLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">随后（期）</label>
+            <input v-model.number="neighborHorizon" class="form-input mono" type="number" min="1" max="10" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="neighborMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="neighborSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="neighborBoardLoading" @click="loadNeighbor">
+            <AppIcon v-if="neighborBoardLoading" name="sync" :size="14" class="spin" />
+            {{ neighborBoardLoading ? '统计中…' : '刷新牵引' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="neighborLoading" @click="runNeighbor">
+            <AppIcon v-if="neighborLoading" name="sync" :size="14" class="spin" />
+            {{ neighborLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="neighborLoading" @click="fillLatestNeighbor">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ neighborHint }}</p>
+        <p v-if="neighborError" class="bet-error">{{ neighborError }}</p>
+
+        <div v-if="neighborBoardLoading && !neighbor" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计牵引…
+        </div>
+        <div v-else-if="neighbor" class="neighbor-list">
+          <p class="text-xs text-muted">
+            样本 {{ neighbor.sample_size }} 期 · 随后 {{ neighbor.horizon }} 期
+            · 边界不绕圈 · 牵出 {{ neighborPullCount }} 条
+          </p>
+          <div v-if="neighbor.latest_draw" class="neighbor-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ neighbor.latest_draw.issue }} 期</span>
+              </div>
+              <NumberBalls :numbers="neighbor.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!neighbor.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看邻号在随后几期是否更常出现。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <template v-if="neighbor.mode === 'digit'">
+              <div v-for="pos in neighbor.positions" :key="pos.index" class="neighbor-pos">
+                <div class="card-title">{{ pos.label }}
+                  <span class="sub">同一位置的邻号，0 和 9 不绕圈</span>
+                </div>
+                <div v-if="!pos.pulled.length" class="text-xs text-muted">这个位置还没有完整的随后窗口</div>
+                <div v-else class="neighbor-band">
+                  <span class="neighbor-tag">邻号</span>
+                  <div class="balls">
+                    <span v-for="edge in neighborTop(pos.pulled)" :key="pos.index + '-' + edge.source + '-' + edge.number + '-' + edge.side" class="neighbor-chip">
+                      <span class="ball sm" :class="ballClass(type)" :title="neighborTip(edge)">{{ edge.number }}</span>
+                      <span class="neighbor-meta">{{ edge.source }} → {{ neighborSigned(edge.lift) }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="card-title">主号 <span class="sub">牵得最勤的邻号，同期一起开出不算</span></div>
+              <div v-if="!neighbor.pulled.length" class="text-xs text-muted">这窗里还没有完整的随后窗口</div>
+              <div v-else class="neighbor-band">
+                <span class="neighbor-tag">邻号</span>
+                <div class="balls">
+                  <span v-for="edge in neighborTop(neighbor.pulled)" :key="edge.source + '-' + edge.number + '-' + edge.side" class="neighbor-chip">
+                    <span class="ball sm" :class="ballClass(type)" :title="neighborTip(edge)">{{ edge.number }}</span>
+                    <span class="neighbor-meta">{{ edge.source }} → {{ neighborSigned(edge.lift) }}</span>
+                  </span>
+                </div>
+              </div>
+            </template>
+
+            <div v-if="neighbor.special" class="neighbor-pos">
+              <div class="card-title">{{ neighbor.special.label }} <span class="sub">单独统计，不计入主号牵引</span></div>
+              <div v-if="!neighbor.special.pulled.length" class="text-xs text-muted">特别号还没有完整的随后窗口</div>
+              <div v-else class="neighbor-band">
+                <span class="neighbor-tag">邻号</span>
+                <div class="balls">
+                  <span
+                    v-for="edge in neighborTop(neighbor.special.pulled)"
+                    :key="'sp-' + edge.source + '-' + edge.number + '-' + edge.side"
+                    class="neighbor-chip"
+                  >
+                    <span class="ball sm" :class="ballClass(type, 'special')" :title="neighborTip(edge)">{{ edge.number }}</span>
+                    <span class="neighbor-meta">{{ edge.source }} → {{ neighborSigned(edge.lift) }}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="neighborScore" class="neighbor-score">
+            <div class="card-title">这注的牵引</div>
+            <p class="text-xs text-muted">{{ neighborScoreText }}</p>
+            <div class="neighbor-row">
+              <div class="echo-draw">
+                <div class="echo-meta"><span>这注</span><span>亮圈是被牵到的号</span></div>
+                <NumberBalls :numbers="neighborScoreView.numbers" :type="type" :marks="neighborScoreView.marks" size="sm" />
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ neighborScore.ticket.score }}</div>
+                <div class="text-xs text-muted">牵引</div>
+              </div>
+            </div>
+            <div v-if="neighborSpecialScored" class="neighbor-pos">
+              <div class="card-title">{{ neighbor.special?.label || '特别号' }} <span class="sub">这注的特别号，不计入主号分</span></div>
+              <div class="neighbor-band">
+                <span class="neighbor-tag">牵引</span>
+                <div class="balls">
+                  <span v-for="n in neighborScore.special_ticket.pulled" :key="'nsp' + n" class="ball sm" :class="ballClass(type, 'special')">{{ n }}</span>
+                  <span v-if="!neighborScore.special_ticket.pulled.length" class="text-xs text-muted">没有</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -970,7 +1114,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -1077,6 +1221,16 @@ const momentumError = ref('')
 const momentumLoading = ref(false)
 const momentumBoardLoading = ref(false)
 let momentumToken = 0
+const neighborLimit = ref(80)
+const neighborHorizon = ref(3)
+const neighborMain = ref('')
+const neighborSpecial = ref('')
+const neighbor = ref(null)
+const neighborScore = ref(null)
+const neighborError = ref('')
+const neighborLoading = ref(false)
+const neighborBoardLoading = ref(false)
+let neighborToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -1133,6 +1287,58 @@ const momentumScoreText = computed(() => {
     text += `。特别号升温 ${special.rising_count}、降温 ${special.falling_count}、持平 ${special.flat_count}，不计入主号分`
   }
   return `${text}。仅供娱乐，不构成投注建议。`
+})
+const neighborHint = computed(() => (
+  echoField.value.digit
+    ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
+    : '某个主号开出后，随后几期会不会开出旁边的号。同期一起开出不算，号码自己重开也不算。特别号单独看。仅供娱乐，不构成投注建议。'
+))
+const neighborPullCount = computed(() => {
+  const body = neighbor.value
+  if (!body) return 0
+  if (body.mode === 'digit') return (body.positions || []).reduce((sum, pos) => sum + (pos.pulled || []).length, 0)
+  return (body.pulled || []).length
+})
+const neighborScoreText = computed(() => {
+  const score = neighborScore.value
+  if (!score?.ticket) return ''
+  const ticket = score.ticket
+  const strength = neighborSigned(ticket.strength)
+  let text = `这注有 ${ticket.score} 个号挨着最近 ${score.horizon} 期开出的主号，牵引差合计 ${strength}`
+  const special = score.special_ticket
+  if ((special?.pulled_count || 0) + (special?.idle_count || 0) > 0) {
+    text += `。特别号牵引 ${special.score} 个，不计入主号`
+  }
+  return `${text}。仅供娱乐，不构成投注建议。`
+})
+const neighborSpecialScored = computed(() => {
+  const special = neighborScore.value?.special_ticket
+  if (!special) return false
+  return (special.pulled_count || 0) + (special.idle_count || 0) > 0
+})
+const neighborScoreView = computed(() => {
+  const score = neighborScore.value
+  if (!score?.query) return { numbers: { main: [], special: [] }, marks: null }
+  const items = score.ticket?.items || []
+  if (score.mode === 'digit') {
+    const positions = items.map((item) => [item.number])
+    const marks = items.map((item) => [Boolean(item.pulled)])
+    if ((score.query.special || []).length) {
+      const shared = new Set(score.special_ticket?.pulled || [])
+      positions.push(score.query.special)
+      marks.push(score.query.special.map((n) => shared.has(String(n))))
+    }
+    return { numbers: { positions }, marks: { positions: marks } }
+  }
+  const shared = new Set(score.ticket?.pulled || [])
+  const sharedSpecial = new Set(score.special_ticket?.pulled || [])
+  return {
+    numbers: { main: score.query.main, special: score.query.special },
+    marks: {
+      main: (score.query.main || []).map((n) => shared.has(String(n))),
+      special: (score.query.special || []).map((n) => sharedSpecial.has(String(n))),
+    },
+  }
 })
 const momentumSpecialScored = computed(() => {
   const special = momentumScore.value?.special_ticket
@@ -1580,6 +1786,86 @@ async function runMomentum() {
   }
 }
 
+function neighborWindow() {
+  let limit = Math.round(Number(neighborLimit.value))
+  let horizon = Math.round(Number(neighborHorizon.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(horizon)) horizon = 3
+  limit = Math.min(200, Math.max(5, limit))
+  horizon = Math.min(10, Math.max(1, horizon))
+  neighborLimit.value = limit
+  neighborHorizon.value = horizon
+  return { limit, horizon }
+}
+
+function neighborTop(rows, count = 8) {
+  return (rows || []).slice(0, count)
+}
+
+function neighborSigned(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  const text = number.toFixed(4)
+  return number > 0 ? `+${text}` : text
+}
+
+function neighborTip(edge) {
+  if (!edge) return ''
+  return `来自 ${edge.source} · 随后出现 ${edge.hits}/${edge.opportunities} · 比基线 ${neighborSigned(edge.lift)}。仅供娱乐，不构成投注建议。`
+}
+
+async function loadNeighbor() {
+  const token = ++neighborToken
+  neighborBoardLoading.value = true
+  const params = neighborWindow()
+  try {
+    const body = await getNeighbor(type.value, params)
+    if (token !== neighborToken) return
+    neighbor.value = body
+    neighborScore.value = null
+    neighborError.value = ''
+  } catch (e) {
+    if (token !== neighborToken) return
+    neighbor.value = null
+    neighborScore.value = null
+    neighborError.value = e.message || '牵引加载失败'
+  } finally {
+    if (token === neighborToken) neighborBoardLoading.value = false
+  }
+}
+
+async function runNeighbor() {
+  neighborLoading.value = true
+  neighborError.value = ''
+  const params = neighborWindow()
+  try {
+    const main = splitNums(neighborMain.value)
+    const special = echoField.value.specialLabel ? splitNums(neighborSpecial.value) : []
+    const body = await postNeighbor(type.value, { main, special, ...params })
+    neighbor.value = body
+    neighborScore.value = body
+  } catch (e) {
+    neighborScore.value = null
+    neighborError.value = e.message || '打分失败'
+  } finally {
+    neighborLoading.value = false
+  }
+}
+
+async function fillLatestNeighbor() {
+  neighborError.value = ''
+  if (!neighbor.value) await loadNeighbor()
+  const latest = neighbor.value?.latest_draw
+  if (!latest) {
+    neighborScore.value = null
+    neighborError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  neighborMain.value = (latest.main || []).join(' ')
+  neighborSpecial.value = (latest.special || []).join(' ')
+  await runNeighbor()
+}
+
 async function fillLatestMomentum() {
   momentumError.value = ''
   if (!momentum.value) await loadMomentum()
@@ -1672,11 +1958,19 @@ function load() {
   momentumSpecial.value = ''
   momentumShort.value = 10
   momentumLong.value = 50
+  neighbor.value = null
+  neighborScore.value = null
+  neighborError.value = ''
+  neighborMain.value = ''
+  neighborSpecial.value = ''
+  neighborLimit.value = 80
+  neighborHorizon.value = 3
   loadDraws()
   loadAnalysis()
   loadAffinity()
   loadRepeat()
   loadMomentum()
+  loadNeighbor()
 }
 
 watch(periods, () => {
