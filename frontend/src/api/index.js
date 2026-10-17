@@ -83,6 +83,15 @@ export const api = {
     return request(`/api/analysis/${type}/sum?${params}`)
   },
   sumScore: (type, body) => request(`/api/analysis/${type}/sum/score`, { method: 'POST', body: JSON.stringify(body) }),
+  parity: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/parity?${params}`)
+  },
+  parityScore: (type, body) => request(`/api/analysis/${type}/parity/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -146,6 +155,14 @@ export function getSum(type, params) {
 
 export function postSum(type, body) {
   return api.sumScore(type, body)
+}
+
+export function getParity(type, params) {
+  return api.parity(type, params)
+}
+
+export function postParity(type, body) {
+  return api.parityScore(type, body)
 }
 
 export async function downloadRecords() {
