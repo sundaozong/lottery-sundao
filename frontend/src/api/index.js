@@ -56,6 +56,15 @@ export const api = {
     return request(`/api/analysis/${type}/span?${params}`)
   },
   spanScore: (type, body) => request(`/api/analysis/${type}/span`, { method: 'POST', body: JSON.stringify(body) }),
+  cluster: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/cluster?${params}`)
+  },
+  clusterScore: (type, body) => request(`/api/analysis/${type}/cluster`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -95,6 +104,14 @@ export function getSpan(type, params) {
 
 export function postSpan(type, body) {
   return api.spanScore(type, body)
+}
+
+export function getCluster(type, params) {
+  return api.cluster(type, params)
+}
+
+export function postCluster(type, body) {
+  return api.clusterScore(type, body)
 }
 
 export async function downloadRecords() {

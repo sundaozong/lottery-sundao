@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇</p>
       </div>
     </div>
 
@@ -1099,6 +1099,175 @@
       </div>
     </div>
 
+    <div class="mb-4">
+      <div class="section-head">
+        <span>连号簇脉动</span>
+        <span class="sub">短窗对比长窗 · 变长与变短 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ cluster?.disclaimer || '连号簇脉动看主号连号簇最长长度的历史分布，以及短窗相对长窗是变长还是变短，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="clusterLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="clusterShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="clusterLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="clusterMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="clusterSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="clusterBoardLoading" @click="loadCluster">
+            <AppIcon v-if="clusterBoardLoading" name="sync" :size="14" class="spin" />
+            {{ clusterBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="clusterLoading" @click="runCluster">
+            <AppIcon v-if="clusterLoading" name="sync" :size="14" class="spin" />
+            {{ clusterLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="clusterLoading" @click="fillLatestCluster">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ clusterHint }}</p>
+        <p v-if="clusterError" class="bet-error">{{ clusterError }}</p>
+
+        <div v-if="clusterBoardLoading && !cluster" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计连号簇…
+        </div>
+        <div v-else-if="cluster" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ cluster.sample_size }} 期 · 平均 {{ spanStat(cluster.mean) }} · 中位 {{ spanStat(cluster.median) }}
+            · 短窗 {{ spanStat(cluster.short_avg) }} · 长窗 {{ spanStat(cluster.long_avg) }} · 脉动 {{ spanSigned(cluster.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(cluster.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ cluster.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="cluster.drift || 'flat'">{{ clusterDriftLabel(cluster.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(cluster.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ cluster.long }} 期</div>
+            </div>
+          </div>
+          <p v-if="cluster.cluster_counts" class="text-xs text-muted">
+            簇个数 · 短窗 {{ spanStat(cluster.cluster_counts.short_avg) }} · 长窗 {{ spanStat(cluster.cluster_counts.long_avg) }}
+            · 脉动 {{ spanSigned(cluster.cluster_counts.pulse) }} · {{ clusterCountDriftLabel(cluster.cluster_counts.drift) }}
+          </p>
+          <div v-if="cluster.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ cluster.latest_draw.issue }} 期</span>
+                <span>最长簇 {{ cluster.latest_draw.max_len }} · {{ cluster.latest_draw.clusters }} 个簇</span>
+              </div>
+              <NumberBalls :numbers="cluster.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!cluster.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看主号连号簇有多长，以及短窗相对长窗是变长还是变短。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              最长簇分布
+              <span class="sub">{{ cluster.basis === 'digits' ? '按位相邻差为 1，0 和 9 不绕圈' : '主号去重后挨在一起的最长一段' }}，没有连号记为 1，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in clusterBars" :key="bucket.max_len" class="span-bar" :class="{ 'is-current': clusterCurrent(bucket.max_len) }">
+                <span class="mono">{{ bucket.max_len }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, cluster.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <p v-if="clusterBarsCollapsed" class="text-xs text-muted">最长簇拉得比较开，这里只展开出现过的档。</p>
+            <div v-if="cluster.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in cluster.common" :key="'c' + item.max_len" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="ball sm" :class="ballClass(type)">{{ item.max_len }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="clusterCountBars.length" class="span-pos">
+              <div class="card-title">簇个数 <span class="sub">长度至少为 2 的簇有几个，不参与上面的主脉动</span></div>
+              <div class="span-bars">
+                <div v-for="bucket in clusterCountBars" :key="'n' + bucket.clusters" class="span-bar">
+                  <span class="mono">{{ bucket.clusters }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, cluster.cluster_counts.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="cluster.special" class="span-pos">
+              <div class="card-title">{{ cluster.special.label }} <span class="sub">至少两个特别号才算连号簇，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ cluster.special.sample_size }} 期 · 短窗 {{ spanStat(cluster.special.short_avg) }} · 长窗 {{ spanStat(cluster.special.long_avg) }}
+                · {{ clusterDriftLabel(cluster.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in clusterSpecialBars" :key="'s' + bucket.max_len" class="span-bar">
+                  <span class="mono">{{ bucket.max_len }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, cluster.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="clusterScore" class="span-score">
+            <div class="card-title">这注的连号簇</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(clusterScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(clusterScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ clusterScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ clusterScore.ticket.max_len }}</div>
+                <div class="text-xs text-muted">最长簇 · {{ clusterScore.ticket.clusters }} 个</div>
+              </div>
+            </div>
+            <div v-if="clusterSpecialScored" class="span-pos">
+              <div class="card-title">{{ cluster.special?.label || '特别号' }} <span class="sub">这注的特别号连号簇，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ clusterScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ clusterScore.special_ticket.max_len }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(clusterScore.special_ticket.rarity) }} · {{ clusterScore.special_ticket.clusters }} 个</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -1267,7 +1436,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -1395,6 +1564,17 @@ const spanError = ref('')
 const spanLoading = ref(false)
 const spanBoardLoading = ref(false)
 let spanToken = 0
+const clusterLimit = ref(80)
+const clusterShort = ref(10)
+const clusterLong = ref(50)
+const clusterMain = ref('')
+const clusterSpecial = ref('')
+const cluster = ref(null)
+const clusterScore = ref(null)
+const clusterError = ref('')
+const clusterLoading = ref(false)
+const clusterBoardLoading = ref(false)
+let clusterToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -1464,6 +1644,19 @@ const spanBarsCollapsed = computed(() => {
 })
 const spanSpecialBars = computed(() => spanVisibleBars(span.value?.special?.distribution))
 const spanSpecialScored = computed(() => spanScore.value?.special_ticket?.span != null)
+const clusterHint = computed(() => (
+  echoField.value.digit
+    ? '按位从左到右，相邻位相差 1 算连号，0 和 9 不绕圈。没有连号时最长簇记为 1。短窗平均比长窗高出 0.5 算变长。仅供娱乐，不构成投注建议。'
+    : '主号去重后，挨在一起的号码算一簇，特别号不并进去。有两个及以上特别号时另看它们的连号簇。没有连号时最长簇记为 1。短窗平均比长窗高出 0.5 算变长。仅供娱乐，不构成投注建议。'
+))
+const clusterBars = computed(() => pulseVisibleBars(cluster.value?.distribution, 'max_len'))
+const clusterBarsCollapsed = computed(() => {
+  const rows = cluster.value?.distribution || []
+  return clusterBars.value.length < rows.length
+})
+const clusterCountBars = computed(() => pulseVisibleBars(cluster.value?.cluster_counts?.distribution, 'clusters'))
+const clusterSpecialBars = computed(() => pulseVisibleBars(cluster.value?.special?.distribution, 'max_len'))
+const clusterSpecialScored = computed(() => clusterScore.value?.special_ticket?.max_len != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -2137,6 +2330,102 @@ async function runSpan() {
   }
 }
 
+function pulseVisibleBars(rows, key) {
+  const list = rows || []
+  if (list.length < 2) return list
+  const lo = list[0][key]
+  const hi = list[list.length - 1][key]
+  if (hi - lo > 28) return list.filter((row) => row.count > 0)
+  return list
+}
+
+function clusterWindows() {
+  let limit = Math.round(Number(clusterLimit.value))
+  let short = Math.round(Number(clusterShort.value))
+  let long = Math.round(Number(clusterLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  clusterLimit.value = limit
+  clusterShort.value = short
+  clusterLong.value = long
+  return { limit, short, long }
+}
+
+function clusterDriftLabel(drift) {
+  if (drift === 'rising') return '变长'
+  if (drift === 'falling') return '变短'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function clusterCountDriftLabel(drift) {
+  if (drift === 'rising') return '变多'
+  if (drift === 'falling') return '变少'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function clusterCurrent(value) {
+  return clusterScore.value?.ticket?.max_len === value
+}
+
+async function loadCluster() {
+  const token = ++clusterToken
+  clusterBoardLoading.value = true
+  const params = clusterWindows()
+  try {
+    const body = await getCluster(type.value, params)
+    if (token !== clusterToken) return
+    cluster.value = body
+    clusterScore.value = null
+    clusterError.value = ''
+  } catch (e) {
+    if (token !== clusterToken) return
+    cluster.value = null
+    clusterScore.value = null
+    clusterError.value = e.message || '连号簇加载失败'
+  } finally {
+    if (token === clusterToken) clusterBoardLoading.value = false
+  }
+}
+
+async function runCluster() {
+  clusterLoading.value = true
+  clusterError.value = ''
+  const params = clusterWindows()
+  try {
+    const main = splitNums(clusterMain.value)
+    const special = echoField.value.specialLabel ? splitNums(clusterSpecial.value) : []
+    const body = await postCluster(type.value, { main, special, ...params })
+    cluster.value = body
+    clusterScore.value = body
+  } catch (e) {
+    clusterScore.value = null
+    clusterError.value = e.message || '打分失败'
+  } finally {
+    clusterLoading.value = false
+  }
+}
+
+async function fillLatestCluster() {
+  clusterError.value = ''
+  if (!cluster.value) await loadCluster()
+  const latest = cluster.value?.latest_draw
+  if (!latest) {
+    clusterScore.value = null
+    clusterError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  clusterMain.value = (latest.main || []).join(' ')
+  clusterSpecial.value = (latest.special || []).join(' ')
+  await runCluster()
+}
+
 async function fillLatestSpan() {
   spanError.value = ''
   if (!span.value) await loadSpan()
@@ -2272,6 +2561,14 @@ function load() {
   spanLimit.value = 80
   spanShort.value = 10
   spanLong.value = 50
+  cluster.value = null
+  clusterScore.value = null
+  clusterError.value = ''
+  clusterMain.value = ''
+  clusterSpecial.value = ''
+  clusterLimit.value = 80
+  clusterShort.value = 10
+  clusterLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -2279,6 +2576,7 @@ function load() {
   loadMomentum()
   loadNeighbor()
   loadSpan()
+  loadCluster()
 }
 
 watch(periods, () => {
