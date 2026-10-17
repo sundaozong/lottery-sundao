@@ -853,3 +853,107 @@ button.ball {
   outline-offset: 2px;
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
+
+/* ---------- 跨度脉动 ---------- */
+.span-list { margin-top: 14px; }
+.span-pos { margin-top: 14px; }
+.span-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.span-meter {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+.span-meter-num {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text);
+}
+.span-meter > :last-child { text-align: right; }
+.span-drift {
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: var(--bg-base);
+}
+.span-drift.rising {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+}
+.span-drift.falling {
+  color: var(--gold-ink);
+  background: var(--gold-dim);
+  border-color: var(--gold-border);
+}
+.span-bars { margin-top: 8px; }
+.span-bar {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr 2rem;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.span-bar.is-current { color: var(--accent); }
+.span-bar-track {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.span-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+.span-bar.is-current .span-bar-fill { background: var(--gold); }
+.span-band {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+}
+.span-tag {
+  flex: none;
+  width: 2.4rem;
+  padding-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.span-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 8px 0;
+}
+.span-meta {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.span-score { margin-top: 8px; }
+.span-score .span-row { align-items: flex-start; }
+.span-score .echo-draw { flex: 1; min-width: 0; }
+.span-windows { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 768px) {
+  .span-windows { grid-template-columns: 1fr; }
+}

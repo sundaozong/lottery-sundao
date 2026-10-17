@@ -47,6 +47,15 @@ export const api = {
     return request(`/api/analysis/${type}/neighbor?${params}`)
   },
   neighborScore: (type, body) => request(`/api/analysis/${type}/neighbor`, { method: 'POST', body: JSON.stringify(body) }),
+  span: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/span?${params}`)
+  },
+  spanScore: (type, body) => request(`/api/analysis/${type}/span`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -78,6 +87,14 @@ export function getNeighbor(type, params) {
 
 export function postNeighbor(type, body) {
   return api.neighborScore(type, body)
+}
+
+export function getSpan(type, params) {
+  return api.span(type, params)
+}
+
+export function postSpan(type, body) {
+  return api.spanScore(type, body)
 }
 
 export async function downloadRecords() {

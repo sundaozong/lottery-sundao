@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度</p>
       </div>
     </div>
 
@@ -946,6 +946,159 @@
       </div>
     </div>
 
+    <div class="mb-4">
+      <div class="section-head">
+        <span>跨度脉动</span>
+        <span class="sub">短窗对比长窗 · 变宽与变窄 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ span?.disclaimer || '跨度脉动看主号跨度的历史分布，以及短窗相对长窗是变宽还是变窄，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="spanLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="spanShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="spanLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="spanMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="spanSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="spanBoardLoading" @click="loadSpan">
+            <AppIcon v-if="spanBoardLoading" name="sync" :size="14" class="spin" />
+            {{ spanBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="spanLoading" @click="runSpan">
+            <AppIcon v-if="spanLoading" name="sync" :size="14" class="spin" />
+            {{ spanLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="spanLoading" @click="fillLatestSpan">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ spanHint }}</p>
+        <p v-if="spanError" class="bet-error">{{ spanError }}</p>
+
+        <div v-if="spanBoardLoading && !span" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计跨度…
+        </div>
+        <div v-else-if="span" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ span.sample_size }} 期 · 平均 {{ spanStat(span.mean) }} · 中位 {{ spanStat(span.median) }}
+            · 短窗 {{ spanStat(span.short_avg) }} · 长窗 {{ spanStat(span.long_avg) }} · 脉动 {{ spanSigned(span.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(span.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ span.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="span.drift || 'flat'">{{ spanDriftLabel(span.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(span.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ span.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="span.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ span.latest_draw.issue }} 期</span>
+                <span>跨度 {{ span.latest_draw.span }}</span>
+              </div>
+              <NumberBalls :numbers="span.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!span.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看主号跨度的分布，以及短窗相对长窗是变宽还是变窄。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              跨度分布
+              <span class="sub">{{ span.basis === 'digits' ? '整注各位的最大减最小' : '主号最大号减最小号' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in spanBars" :key="bucket.span" class="span-bar" :class="{ 'is-current': spanCurrent(bucket.span) }">
+                <span class="mono">{{ bucket.span }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, span.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <p v-if="spanBarsCollapsed" class="text-xs text-muted">跨度拉得比较开，这里只展开出现过的档。</p>
+            <div v-if="span.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in span.common" :key="'c' + item.span" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="ball sm" :class="ballClass(type)">{{ item.span }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="span.special" class="span-pos">
+              <div class="card-title">{{ span.special.label }} <span class="sub">至少两个特别号才算跨度，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ span.special.sample_size }} 期 · 短窗 {{ spanStat(span.special.short_avg) }} · 长窗 {{ spanStat(span.special.long_avg) }}
+                · {{ spanDriftLabel(span.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in spanSpecialBars" :key="'s' + bucket.span" class="span-bar">
+                  <span class="mono">{{ bucket.span }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, span.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="spanScore" class="span-score">
+            <div class="card-title">这注的跨度</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(spanScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(spanScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ spanScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanScore.ticket.span }}</div>
+                <div class="text-xs text-muted">跨度</div>
+              </div>
+            </div>
+            <div v-if="spanSpecialScored" class="span-pos">
+              <div class="card-title">{{ span.special?.label || '特别号' }} <span class="sub">这注的特别号跨度，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ spanScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanScore.special_ticket.span }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(spanScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -1114,7 +1267,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -1231,6 +1384,17 @@ const neighborError = ref('')
 const neighborLoading = ref(false)
 const neighborBoardLoading = ref(false)
 let neighborToken = 0
+const spanLimit = ref(80)
+const spanShort = ref(10)
+const spanLong = ref(50)
+const spanMain = ref('')
+const spanSpecial = ref('')
+const span = ref(null)
+const spanScore = ref(null)
+const spanError = ref('')
+const spanLoading = ref(false)
+const spanBoardLoading = ref(false)
+let spanToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -1288,6 +1452,18 @@ const momentumScoreText = computed(() => {
   }
   return `${text}。仅供娱乐，不构成投注建议。`
 })
+const spanHint = computed(() => (
+  echoField.value.digit
+    ? '整注各位数字的最大减最小，0 和 9 不绕圈。特别号不计入主号。短窗平均比长窗高出 0.5 算变宽。仅供娱乐，不构成投注建议。'
+    : '主号里最大号减去最小号，特别号不计入。有两个及以上特别号时另看它们的跨度。短窗平均比长窗高出 0.5 算变宽。仅供娱乐，不构成投注建议。'
+))
+const spanBars = computed(() => spanVisibleBars(span.value?.distribution))
+const spanBarsCollapsed = computed(() => {
+  const rows = span.value?.distribution || []
+  return spanBars.value.length < rows.length
+})
+const spanSpecialBars = computed(() => spanVisibleBars(span.value?.special?.distribution))
+const spanSpecialScored = computed(() => spanScore.value?.special_ticket?.span != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -1852,6 +2028,129 @@ async function runNeighbor() {
   }
 }
 
+function spanWindows() {
+  let limit = Math.round(Number(spanLimit.value))
+  let short = Math.round(Number(spanShort.value))
+  let long = Math.round(Number(spanLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  spanLimit.value = limit
+  spanShort.value = short
+  spanLong.value = long
+  return { limit, short, long }
+}
+
+function spanVisibleBars(rows) {
+  const list = rows || []
+  if (list.length < 2) return list
+  const lo = list[0].span
+  const hi = list[list.length - 1].span
+  if (hi - lo > 28) return list.filter((row) => row.count > 0)
+  return list
+}
+
+function spanStat(value) {
+  if (value == null || value === '') return '—'
+  const num = Number(value)
+  if (!Number.isFinite(num)) return '—'
+  return String(Math.round(num * 100) / 100)
+}
+
+function spanSigned(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  const text = String(Math.round(number * 100) / 100)
+  return number > 0 ? `+${text}` : text
+}
+
+function spanBarWidth(count, rows) {
+  const max = Math.max(...(rows || []).map((row) => row.count), 1)
+  if (!count) return '0%'
+  return `${Math.max(8, Math.round((count / max) * 100))}%`
+}
+
+function spanDriftLabel(drift) {
+  if (drift === 'rising') return '变宽'
+  if (drift === 'falling') return '变窄'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function spanRarityLabel(rarity) {
+  if (rarity === 'common') return '常见'
+  if (rarity === 'typical') return '居中'
+  if (rarity === 'rare') return '少见'
+  return '暂无对照'
+}
+
+function spanAlignLabel(alignment) {
+  if (alignment === 'aligned') return '顺着脉动'
+  if (alignment === 'against') return '逆着脉动'
+  if (alignment === 'neutral') return '脉动持平'
+  return ''
+}
+
+function spanCurrent(value) {
+  return spanScore.value?.ticket?.span === value
+}
+
+async function loadSpan() {
+  const token = ++spanToken
+  spanBoardLoading.value = true
+  const params = spanWindows()
+  try {
+    const body = await getSpan(type.value, params)
+    if (token !== spanToken) return
+    span.value = body
+    spanScore.value = null
+    spanError.value = ''
+  } catch (e) {
+    if (token !== spanToken) return
+    span.value = null
+    spanScore.value = null
+    spanError.value = e.message || '跨度加载失败'
+  } finally {
+    if (token === spanToken) spanBoardLoading.value = false
+  }
+}
+
+async function runSpan() {
+  spanLoading.value = true
+  spanError.value = ''
+  const params = spanWindows()
+  try {
+    const main = splitNums(spanMain.value)
+    const special = echoField.value.specialLabel ? splitNums(spanSpecial.value) : []
+    const body = await postSpan(type.value, { main, special, ...params })
+    span.value = body
+    spanScore.value = body
+  } catch (e) {
+    spanScore.value = null
+    spanError.value = e.message || '打分失败'
+  } finally {
+    spanLoading.value = false
+  }
+}
+
+async function fillLatestSpan() {
+  spanError.value = ''
+  if (!span.value) await loadSpan()
+  const latest = span.value?.latest_draw
+  if (!latest) {
+    spanScore.value = null
+    spanError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  spanMain.value = (latest.main || []).join(' ')
+  spanSpecial.value = (latest.special || []).join(' ')
+  await runSpan()
+}
+
 async function fillLatestNeighbor() {
   neighborError.value = ''
   if (!neighbor.value) await loadNeighbor()
@@ -1965,12 +2264,21 @@ function load() {
   neighborSpecial.value = ''
   neighborLimit.value = 80
   neighborHorizon.value = 3
+  span.value = null
+  spanScore.value = null
+  spanError.value = ''
+  spanMain.value = ''
+  spanSpecial.value = ''
+  spanLimit.value = 80
+  spanShort.value = 10
+  spanLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
   loadRepeat()
   loadMomentum()
   loadNeighbor()
+  loadSpan()
 }
 
 watch(periods, () => {
