@@ -27,6 +27,7 @@ from .parity import score_parity
 from .prime import score_prime
 from .predict import DISCLAIMER
 from .ac import score_ac
+from .hewei import score_hewei
 from .tail import score_tail
 from .zone import score_zone
 from .repeat import score_repeat
@@ -70,6 +71,7 @@ _MEMO_TARGETS = (
     ("app.services.zone", "zone_summary"),
     ("app.services.tail", "tail_summary"),
     ("app.services.ac", "ac_summary"),
+    ("app.services.hewei", "hewei_summary"),
 )
 
 
@@ -93,6 +95,7 @@ PULSE_MODULES = [
     PulseModule("zone", "区位", score_zone),
     PulseModule("tail", "尾数", score_tail),
     PulseModule("ac", "AC值", score_ac),
+    PulseModule("hewei", "和尾", score_hewei),
 ]
 
 

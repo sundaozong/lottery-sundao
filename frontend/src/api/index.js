@@ -128,6 +128,15 @@ export const api = {
     return request(`/api/analysis/${type}/ac?${params}`)
   },
   acScore: (type, body) => request(`/api/analysis/${type}/ac/score`, { method: 'POST', body: JSON.stringify(body) }),
+  hewei: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/hewei?${params}`)
+  },
+  heweiScore: (type, body) => request(`/api/analysis/${type}/hewei/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -231,6 +240,14 @@ export function getAc(type, params) {
 
 export function postAc(type, body) {
   return api.acScore(type, body)
+}
+
+export function getHewei(type, params) {
+  return api.hewei(type, params)
+}
+
+export function postHewei(type, body) {
+  return api.heweiScore(type, body)
 }
 
 export async function downloadRecords() {
