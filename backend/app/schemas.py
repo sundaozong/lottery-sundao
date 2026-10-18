@@ -532,6 +532,91 @@ class JunzhiScoreOut(JunzhiOut):
     special_ticket: JunzhiTicket
 
 
+class ZhongweiIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    short: int = Field(default=10, ge=5, le=30)
+    long: int = Field(default=50, ge=20, le=200)
+
+
+class ZhongweiBucket(BaseModel):
+    median_value: float
+    count: int
+    rate: float
+
+
+class ZhongweiCommon(BaseModel):
+    median_value: float
+    count: int
+    rate: float
+
+
+class ZhongweiLatest(BaseModel):
+    issue: str
+    draw_date: str = ""
+    main: list[str]
+    special: list[str]
+    median_value: Optional[float] = None
+    special_median_value: Optional[float] = None
+
+
+class ZhongweiBlock(BaseModel):
+    label: str
+    sample_size: int
+    distribution: list[ZhongweiBucket]
+    common: list[ZhongweiCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+
+
+class ZhongweiTicket(BaseModel):
+    median_value: Optional[float] = None
+    percentile: Optional[float] = None
+    typicality: Optional[float] = None
+    rarity: Optional[str] = None
+    alignment: Optional[str] = None
+    note: str = ""
+
+
+class ZhongweiQuery(BaseModel):
+    main: list[str]
+    special: list[str]
+
+
+class ZhongweiOut(BaseModel):
+    lottery_type: str
+    mode: str
+    basis: str
+    sample_size: int
+    short: int
+    long: int
+    threshold: float
+    distribution: list[ZhongweiBucket]
+    common: list[ZhongweiCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+    note: str
+    latest_draw: Optional[ZhongweiLatest] = None
+    special: Optional[ZhongweiBlock] = None
+    data_status: str
+    disclaimer: str
+
+
+class ZhongweiScoreOut(ZhongweiOut):
+    query: ZhongweiQuery
+    ticket: ZhongweiTicket
+    special_ticket: ZhongweiTicket
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None
@@ -551,7 +636,7 @@ class PredictIn(BaseModel):
     count: int = Field(default=1, ge=1, le=10)
     weights: Optional[dict[str, float]] = Field(
         default=None,
-        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping、zhenfu、junzhi。",
+        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping、zhenfu、junzhi、zhongwei。",
     )
 
 

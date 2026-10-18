@@ -136,8 +136,8 @@ def test_junzhi_constants_and_equal_weight_registry():
         assert word in DIGIT_NOTE
         assert word in SET_NOTE
     keys = [item.key for item in PULSE_MODULES]
-    assert keys[-1] == "junzhi"
-    assert keys[-2] == "zhenfu"
+    assert keys[-2] == "junzhi"
+    assert keys[-3] == "zhenfu"
     assert [item.label for item in PULSE_MODULES if item.key == "junzhi"] == ["均值"]
     assert ("app.services.junzhi", "junzhi_summary") in _MEMO_TARGETS
     assert len(keys) == len(set(keys))
@@ -648,7 +648,7 @@ def test_ensemble_includes_junzhi_at_equal_weight(db):
     _draw(db, "ssq", "2026001", ["01", "08", "18", "19", "20", "33"], ["09"])
     _draw(db, "ssq", "2026002", ["02", "09", "18", "19", "21", "32"], ["10"])
     scored = score_ticket(db, "ssq", ["03", "08", "14", "19", "25", "31"], ["09"])
-    assert [item["module"] for item in scored["breakdown"]][-1] == "junzhi"
+    assert [item["module"] for item in scored["breakdown"]][-2] == "junzhi"
     row = next(item for item in scored["breakdown"] if item["module"] == "junzhi")
     assert row["label"] == "均值"
     assert row["weight"] == 1.0
@@ -777,7 +777,7 @@ def test_junzhi_endpoints_bounds_and_old_contracts(client, db):
     assert pulse.status_code == 200
     modules = pulse.json()["modules"]
     assert "junzhi" in modules
-    assert modules[-1] == "junzhi"
+    assert modules[-2] == "junzhi"
     assert "zhenfu" in modules
     breakdown = pulse.json()["recommendations"][0]["breakdown"]
     assert any(item["module"] == "junzhi" and item["weight"] == 1.0 for item in breakdown)

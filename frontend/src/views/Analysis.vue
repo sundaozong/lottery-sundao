@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a> · <a href="#zhenfu-pulse">振幅</a> · <a href="#junzhi-pulse">均值</a></p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a> · <a href="#zhenfu-pulse">振幅</a> · <a href="#junzhi-pulse">均值</a> · <a href="#zhongwei-pulse">中位数</a></p>
       </div>
     </div>
 
@@ -3132,6 +3132,158 @@
       </div>
     </div>
 
+    <div class="mb-4" id="zhongwei-pulse">
+      <div class="section-head">
+        <span>中位数脉动</span>
+        <span class="sub">短窗对比长窗 · 主号中位数 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ zhongwei?.disclaimer || '中位数脉动看主号中位数的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="zhongweiLimit" class="form-input mono" type="number" min="5" max="200" @keydown.enter="loadZhongwei" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="zhongweiShort" class="form-input mono" type="number" min="5" max="30" @keydown.enter="loadZhongwei" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="zhongweiLong" class="form-input mono" type="number" min="20" max="200" @keydown.enter="loadZhongwei" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="zhongweiMain" class="form-input mono" :placeholder="echoField.main" @keydown.enter="runZhongwei" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="zhongweiSpecial" class="form-input mono" :placeholder="echoField.special" @keydown.enter="runZhongwei" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="zhongweiBoardLoading" @click="loadZhongwei">
+            <AppIcon v-if="zhongweiBoardLoading" name="sync" :size="14" class="spin" />
+            {{ zhongweiBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="zhongweiLoading" @click="runZhongwei">
+            <AppIcon v-if="zhongweiLoading" name="sync" :size="14" class="spin" />
+            {{ zhongweiLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="zhongweiLoading" @click="fillLatestZhongwei">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ zhongweiHint }}</p>
+        <p v-if="zhongweiError" class="bet-error">{{ zhongweiError }}</p>
+
+        <div v-if="zhongweiBoardLoading && !zhongwei" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计中位数…
+        </div>
+        <div v-else-if="zhongwei" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ zhongwei.sample_size }} 期 · 平均 {{ spanStat(zhongwei.mean) }} · 中位 {{ spanStat(zhongwei.median) }}
+            · 短窗 {{ spanStat(zhongwei.short_avg) }} · 长窗 {{ spanStat(zhongwei.long_avg) }} · 脉动 {{ spanSigned(zhongwei.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(zhongwei.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ zhongwei.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="zhongwei.drift || 'flat'">{{ zhongweiDriftLabel(zhongwei.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(zhongwei.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ zhongwei.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="zhongwei.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ zhongwei.latest_draw.issue }} 期</span>
+                <span>中位数 {{ spanStat(zhongwei.latest_draw.median_value) }}</span>
+              </div>
+              <NumberBalls :numbers="zhongwei.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!zhongwei.sample_size" class="empty">
+            <div class="empty-title">暂无对照</div>
+            <div class="empty-desc">有开奖后，这里会看主号中位数，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              中位数
+              <span class="sub">{{ zhongwei.basis === 'digits' ? '按位取中位数，保留重复，不排序' : '主号去重后取中位数' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in zhongweiBars" :key="bucket.median_value" class="span-bar" :class="{ 'is-current': zhongweiCurrent(bucket.median_value) }">
+                <span class="mono">{{ spanStat(bucket.median_value) }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, zhongwei.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <div v-if="zhongwei.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in zhongwei.common" :key="'zw' + item.median_value" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="span-meta">{{ spanStat(item.median_value) }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="zhongwei.special" class="span-pos">
+              <div class="card-title">{{ zhongwei.special.label }} <span class="sub">有特别号就另算中位数，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ zhongwei.special.sample_size }} 期 · 短窗 {{ spanStat(zhongwei.special.short_avg) }} · 长窗 {{ spanStat(zhongwei.special.long_avg) }}
+                · {{ zhongweiDriftLabel(zhongwei.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in zhongweiSpecialBars" :key="'zws' + bucket.median_value" class="span-bar">
+                  <span class="mono">{{ spanStat(bucket.median_value) }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, zhongwei.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="zhongweiScore" class="span-score">
+            <div class="card-title">这注的中位数</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(zhongweiScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(zhongweiScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ zhongweiScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanStat(zhongweiScore.ticket.median_value) }}</div>
+                <div class="text-xs text-muted">中位数</div>
+              </div>
+            </div>
+            <div v-if="zhongweiSpecialScored" class="span-pos">
+              <div class="card-title">{{ zhongwei.special?.label || '特别号' }} <span class="sub">这注的特别号中位数，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ zhongweiScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanStat(zhongweiScore.special_ticket.median_value) }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(zhongweiScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -3300,7 +3452,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao, getShengping, postShengping, getZhenfu, postZhenfu, getJunzhi, postJunzhi } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao, getShengping, postShengping, getZhenfu, postZhenfu, getJunzhi, postJunzhi, getZhongwei, postZhongwei } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -3571,6 +3723,17 @@ const junzhiError = ref('')
 const junzhiLoading = ref(false)
 const junzhiBoardLoading = ref(false)
 let junzhiToken = 0
+const zhongweiLimit = ref(80)
+const zhongweiShort = ref(10)
+const zhongweiLong = ref(50)
+const zhongweiMain = ref('')
+const zhongweiSpecial = ref('')
+const zhongwei = ref(null)
+const zhongweiScore = ref(null)
+const zhongweiError = ref('')
+const zhongweiLoading = ref(false)
+const zhongweiBoardLoading = ref(false)
+let zhongweiToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -3782,6 +3945,14 @@ const junzhiHint = computed(() => (
 const junzhiBars = computed(() => pulseVisibleBars(junzhi.value?.distribution, 'mean_value'))
 const junzhiSpecialBars = computed(() => pulseVisibleBars(junzhi.value?.special?.distribution, 'mean_value'))
 const junzhiSpecialScored = computed(() => junzhiScore.value?.special_ticket?.mean_value != null)
+const zhongweiHint = computed(() => (
+  echoField.value.digit
+    ? '按抽出的各位取中位数，保留重复和位置，不排序。偶数个取中间两数的平均。中位数保留两位小数。特别号不计入主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+    : '主号去重后取中位数，重复只算一次。偶数个取中间两数的平均。特别号另算，不并进主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+))
+const zhongweiBars = computed(() => pulseVisibleBars(zhongwei.value?.distribution, 'median_value'))
+const zhongweiSpecialBars = computed(() => pulseVisibleBars(zhongwei.value?.special?.distribution, 'median_value'))
+const zhongweiSpecialScored = computed(() => zhongweiScore.value?.special_ticket?.median_value != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -5474,6 +5645,86 @@ async function fillLatestJunzhi() {
   await runJunzhi()
 }
 
+function zhongweiWindows() {
+  let limit = Math.round(Number(zhongweiLimit.value))
+  let short = Math.round(Number(zhongweiShort.value))
+  let long = Math.round(Number(zhongweiLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  zhongweiLimit.value = limit
+  zhongweiShort.value = short
+  zhongweiLong.value = long
+  return { limit, short, long }
+}
+
+function zhongweiDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function zhongweiCurrent(value) {
+  return Number(zhongweiScore.value?.ticket?.median_value) === Number(value)
+}
+
+async function loadZhongwei() {
+  const token = ++zhongweiToken
+  zhongweiBoardLoading.value = true
+  const params = zhongweiWindows()
+  try {
+    const body = await getZhongwei(type.value, params)
+    if (token !== zhongweiToken) return
+    zhongwei.value = body
+    zhongweiScore.value = null
+    zhongweiError.value = ''
+  } catch (e) {
+    if (token !== zhongweiToken) return
+    zhongwei.value = null
+    zhongweiScore.value = null
+    zhongweiError.value = e.message || '中位数加载失败'
+  } finally {
+    if (token === zhongweiToken) zhongweiBoardLoading.value = false
+  }
+}
+
+async function runZhongwei() {
+  zhongweiLoading.value = true
+  zhongweiError.value = ''
+  const params = zhongweiWindows()
+  try {
+    const main = splitNums(zhongweiMain.value)
+    const special = echoField.value.specialLabel ? splitNums(zhongweiSpecial.value) : []
+    const body = await postZhongwei(type.value, { main, special, ...params })
+    zhongwei.value = body
+    zhongweiScore.value = body
+  } catch (e) {
+    zhongweiScore.value = null
+    zhongweiError.value = e.message || '打分失败'
+  } finally {
+    zhongweiLoading.value = false
+  }
+}
+
+async function fillLatestZhongwei() {
+  zhongweiError.value = ''
+  if (!zhongwei.value) await loadZhongwei()
+  const latest = zhongwei.value?.latest_draw
+  if (!latest) {
+    zhongweiScore.value = null
+    zhongweiError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  zhongweiMain.value = (latest.main || []).join(' ')
+  zhongweiSpecial.value = (latest.special || []).join(' ')
+  await runZhongwei()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -5769,6 +6020,14 @@ function load() {
   junzhiLimit.value = 80
   junzhiShort.value = 10
   junzhiLong.value = 50
+  zhongwei.value = null
+  zhongweiScore.value = null
+  zhongweiError.value = ''
+  zhongweiMain.value = ''
+  zhongweiSpecial.value = ''
+  zhongweiLimit.value = 80
+  zhongweiShort.value = 10
+  zhongweiLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -5789,6 +6048,7 @@ function load() {
   loadShengping()
   loadZhenfu()
   loadJunzhi()
+  loadZhongwei()
 }
 
 watch(periods, () => {
