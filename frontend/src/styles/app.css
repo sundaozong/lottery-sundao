@@ -213,6 +213,29 @@
   background: var(--bg-card);
   box-shadow: var(--shadow);
 }
+.predict-row.has-note {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.predict-row-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.constraint-summary {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.constraint-draft {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.constraint-draft .form-input { flex: 1; min-width: 0; }
+.constraint-chip-row { margin-top: 8px; margin-bottom: 0; }
 .predict-row-label {
   flex: 0 0 64px;
   font-size: 0.82rem;
