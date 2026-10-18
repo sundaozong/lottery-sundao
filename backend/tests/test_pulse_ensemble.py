@@ -22,7 +22,7 @@ from app.services.pulse_ensemble import (
     score_ticket,
 )
 
-INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone"}
+INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail"}
 
 
 def _draw(db, lottery_type, issue, main, special=None):
@@ -56,7 +56,7 @@ def _seed_dlt(db, count=10):
 
 def test_registry_uses_existing_ticket_scorers_and_skips_modules_without_one():
     keys = [item.key for item in PULSE_MODULES]
-    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone"]
+    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail"]
     assert len(keys) == len(set(keys))
     skipped = {item["module"]: item["reason"] for item in SKIPPED_MODULES}
     assert {"collision", "echo", "affinity"} <= set(skipped)
@@ -351,6 +351,11 @@ def test_score_ticket_calls_registered_modules(db):
     assert zone["weight"] == 1.0
     assert zone["score"] is not None
     assert "区位" in zone["note"]
+    tail = next(item for item in scored["breakdown"] if item["module"] == "tail")
+    assert tail["label"] == "尾数"
+    assert tail["weight"] == 1.0
+    assert tail["score"] is not None
+    assert "尾数" in tail["note"]
 
 
 def test_existing_strategies_do_not_gain_pulse_fields(db):
@@ -415,7 +420,9 @@ def test_openapi_documents_pulse_strategy(client):
     assert "脉动综合" in description
     weights = schema["properties"]["weights"]["description"]
     assert "zone" in weights
+    assert "tail" in weights
     post = spec.json()["paths"]["/api/predict"]["post"]
     text = f"{post.get('summary', '')} {post.get('description', '')}"
     assert "pulse" in text or "脉动" in text
     assert "区位" in text
+    assert "尾数" in text

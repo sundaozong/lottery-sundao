@@ -110,6 +110,15 @@ export const api = {
     return request(`/api/analysis/${type}/zone?${params}`)
   },
   zoneScore: (type, body) => request(`/api/analysis/${type}/zone/score`, { method: 'POST', body: JSON.stringify(body) }),
+  tail: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/tail?${params}`)
+  },
+  tailScore: (type, body) => request(`/api/analysis/${type}/tail/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -197,6 +206,14 @@ export function getZone(type, params) {
 
 export function postZone(type, body) {
   return api.zoneScore(type, body)
+}
+
+export function getTail(type, params) {
+  return api.tail(type, params)
+}
+
+export function postTail(type, body) {
+  return api.tailScore(type, body)
 }
 
 export async function downloadRecords() {

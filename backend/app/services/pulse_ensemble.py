@@ -26,6 +26,7 @@ from .neighbor import score_neighbor
 from .parity import score_parity
 from .prime import score_prime
 from .predict import DISCLAIMER
+from .tail import score_tail
 from .zone import score_zone
 from .repeat import score_repeat
 from .road import score_road
@@ -66,6 +67,7 @@ _MEMO_TARGETS = (
     ("app.services.parity", "parity_summary"),
     ("app.services.prime", "prime_summary"),
     ("app.services.zone", "zone_summary"),
+    ("app.services.tail", "tail_summary"),
 )
 
 
@@ -87,6 +89,7 @@ PULSE_MODULES = [
     PulseModule("parity", "奇偶", score_parity),
     PulseModule("prime", "质合", score_prime),
     PulseModule("zone", "区位", score_zone),
+    PulseModule("tail", "尾数", score_tail),
 ]
 
 
