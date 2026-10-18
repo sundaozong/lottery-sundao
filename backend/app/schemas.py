@@ -41,6 +41,12 @@ class RecordUpdate(BaseModel):
     purchased_at: Optional[str] = None
 
 
+class RecordVerifyIn(BaseModel):
+    """apply 默认关闭：先预览差额，确认后再写回奖金。"""
+    apply: bool = False
+    record_ids: Optional[list[int]] = None
+
+
 class PrizeCalcIn(BaseModel):
     lottery_type: str
     bet_numbers: Any

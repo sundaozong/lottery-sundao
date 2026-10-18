@@ -5,7 +5,11 @@
         <h1>购买记录</h1>
         <p>流水 · 盈亏汇总 · CRUD</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 records-actions">
+        <button class="btn btn-ghost btn-sm" type="button" :disabled="verifying" @click="verifyDraws">
+          <AppIcon name="checkCircle" :size="13" />
+          {{ verifying ? '核对中…' : '开奖核对' }}
+        </button>
         <button class="btn btn-ghost btn-sm" type="button" :disabled="exporting" @click="exportCsv">
           <AppIcon name="download" :size="13" />
           {{ exporting ? '导出中…' : '导出 CSV' }}
@@ -138,7 +142,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in items" :key="r.id">
+            <tr v-for="r in items" :key="r.id" :class="{ 'row-verified': verifiedIds.includes(r.id) }">
               <td>{{ r.name }}</td>
               <td class="mono">{{ r.issue }}</td>
               <td>
@@ -187,6 +191,9 @@ const repeats = ref([])
 const rhythmNote = ref('')
 const showForm = ref(false)
 const exporting = ref(false)
+const verifying = ref(false)
+const verifiedIds = ref([])
+let verifyHighlightTimer = null
 const editingId = ref(null)
 const form = ref(blank())
 const bet = ref(defaultBet('ssq'))
@@ -405,6 +412,46 @@ async function save() {
     toast(wasEditing ? '记录已更新' : '记录已保存', 'ok')
   } catch (e) {
     toast(e.message, 'error', 4000)
+  }
+}
+
+function verifyToast(summary) {
+  const parts = [
+    `更新 ${summary.updated || 0}`,
+    `无开奖 ${summary.no_draw || 0}`,
+    `无期号 ${summary.no_issue || 0}`,
+  ]
+  if (summary.unchanged) parts.push(`未变 ${summary.unchanged}`)
+  if (summary.error) parts.push(`无法计算 ${summary.error}`)
+  return parts.join(' / ')
+}
+
+async function verifyDraws() {
+  const ok = await confirmDialog({
+    title: '开奖核对',
+    message: '按本地开奖和期号重算奖金，并写回购买记录。只改奖金，不改投入、号码和期号。金额为示意，以官方兑奖为准。',
+    confirmText: '核对并写回',
+    cancelText: '取消',
+    danger: false,
+  })
+  if (!ok) return
+  verifying.value = true
+  try {
+    const res = await api.verifyRecords({ apply: true })
+    const ids = (res.items || []).filter((item) => item.status === 'updated').map((item) => item.id)
+    await load()
+    verifiedIds.value = ids
+    if (verifyHighlightTimer) clearTimeout(verifyHighlightTimer)
+    verifyHighlightTimer = setTimeout(() => {
+      verifiedIds.value = []
+      verifyHighlightTimer = null
+    }, 2600)
+    const summary = res.summary || {}
+    toast(verifyToast(summary), summary.error ? 'info' : 'ok', 4000)
+  } catch (e) {
+    toast(e.message, 'error', 4000)
+  } finally {
+    verifying.value = false
   }
 }
 

@@ -550,6 +550,10 @@
   background: var(--bg-card);
   z-index: 2;
 }
+.records-actions { flex-wrap: wrap; justify-content: flex-end; }
+.records-table tbody tr.row-verified td {
+  background: var(--accent-dim);
+}
 @media (max-width: 768px) {
   .table-wrap-plain { overflow-x: auto; }
   .records-table thead th { position: static; }
