@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值</p>
       </div>
     </div>
 
@@ -2217,6 +2217,159 @@
       </div>
     </div>
 
+    <div class="mb-4" id="ac-pulse">
+      <div class="section-head">
+        <span>AC值脉动</span>
+        <span class="sub">短窗对比长窗 · 算术复杂度升降 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ acPulse?.disclaimer || 'AC值脉动看主号算术复杂度的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="acLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="acShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="acLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="acMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="acSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="acBoardLoading" @click="loadAc">
+            <AppIcon v-if="acBoardLoading" name="sync" :size="14" class="spin" />
+            {{ acBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="acLoading" @click="runAc">
+            <AppIcon v-if="acLoading" name="sync" :size="14" class="spin" />
+            {{ acLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="acLoading" @click="fillLatestAc">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ acHint }}</p>
+        <p v-if="acError" class="bet-error">{{ acError }}</p>
+
+        <div v-if="acBoardLoading && !acPulse" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计 AC 值…
+        </div>
+        <div v-else-if="acPulse" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ acPulse.sample_size }} 期 · 平均 {{ spanStat(acPulse.mean) }} · 中位 {{ spanStat(acPulse.median) }}
+            · 短窗 {{ spanStat(acPulse.short_avg) }} · 长窗 {{ spanStat(acPulse.long_avg) }} · 脉动 {{ spanSigned(acPulse.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(acPulse.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ acPulse.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="acPulse.drift || 'flat'">{{ acDriftLabel(acPulse.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(acPulse.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ acPulse.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="acPulse.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ acPulse.latest_draw.issue }} 期</span>
+                <span>AC值 {{ spanStat(acPulse.latest_draw.ac_value) }}</span>
+              </div>
+              <NumberBalls :numbers="acPulse.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!acPulse.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看主号算术复杂度的分布，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              AC值分布
+              <span class="sub">{{ acPulse.basis === 'digits' ? '整注各位数字从小到大排列，0 和 9 不绕圈' : '主号去重后从小到大排列，两两差值去重再减去个数减一' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in acBars" :key="bucket.ac_value" class="span-bar" :class="{ 'is-current': acCurrent(bucket.ac_value) }">
+                <span class="mono">{{ bucket.ac_value }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, acPulse.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <p v-if="acBarsCollapsed" class="text-xs text-muted">AC值拉得比较开，这里只展开出现过的档。</p>
+            <div v-if="acPulse.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in acPulse.common" :key="'ac' + item.ac_value" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="ball sm" :class="ballClass(type)">{{ item.ac_value }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="acPulse.special" class="span-pos">
+              <div class="card-title">{{ acPulse.special.label }} <span class="sub">至少两个特别号才算算术复杂度，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ acPulse.special.sample_size }} 期 · 短窗 {{ spanStat(acPulse.special.short_avg) }} · 长窗 {{ spanStat(acPulse.special.long_avg) }}
+                · {{ acDriftLabel(acPulse.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in acSpecialBars" :key="'acs' + bucket.ac_value" class="span-bar">
+                  <span class="mono">{{ bucket.ac_value }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, acPulse.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="acScore" class="span-score">
+            <div class="card-title">这注的 AC 值</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(acScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(acScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ acScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanStat(acScore.ticket.ac_value) }}</div>
+                <div class="text-xs text-muted">AC值</div>
+              </div>
+            </div>
+            <div v-if="acSpecialScored" class="span-pos">
+              <div class="card-title">{{ acPulse.special?.label || '特别号' }} <span class="sub">这注的特别号算术复杂度，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ acScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanStat(acScore.special_ticket.ac_value) }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(acScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -2385,7 +2538,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -2590,6 +2743,17 @@ const tailError = ref('')
 const tailLoading = ref(false)
 const tailBoardLoading = ref(false)
 let tailToken = 0
+const acLimit = ref(80)
+const acShort = ref(10)
+const acLong = ref(50)
+const acMain = ref('')
+const acSpecial = ref('')
+const acPulse = ref(null)
+const acScore = ref(null)
+const acError = ref('')
+const acLoading = ref(false)
+const acBoardLoading = ref(false)
+let acToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -2744,6 +2908,18 @@ const tailBarsCollapsed = computed(() => {
 })
 const tailSpecialBars = computed(() => pulseVisibleBars(tail.value?.special?.distribution, 'unique_tail_count'))
 const tailSpecialScored = computed(() => tailScore.value?.special_ticket?.unique_tail_count != null)
+const acHint = computed(() => (
+  echoField.value.digit
+    ? '整注各位数字从小到大排列，两两绝对差去重后再减去位数减一，0 和 9 不绕圈。少于两位不算。特别号不计入主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+    : '主号去重后从小到大排列，两两绝对差去重后再减去号码个数减一。少于两个主号不算，不记成 0。特别号不并进去，至少两个特别号才另算。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+))
+const acBars = computed(() => pulseVisibleBars(acPulse.value?.distribution, 'ac_value'))
+const acBarsCollapsed = computed(() => {
+  const rows = acPulse.value?.distribution || []
+  return acBars.value.length < rows.length
+})
+const acSpecialBars = computed(() => pulseVisibleBars(acPulse.value?.special?.distribution, 'ac_value'))
+const acSpecialScored = computed(() => acScore.value?.special_ticket?.ac_value != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -3946,6 +4122,86 @@ async function fillLatestTail() {
   await runTail()
 }
 
+function acWindows() {
+  let limit = Math.round(Number(acLimit.value))
+  let short = Math.round(Number(acShort.value))
+  let long = Math.round(Number(acLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  acLimit.value = limit
+  acShort.value = short
+  acLong.value = long
+  return { limit, short, long }
+}
+
+function acDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function acCurrent(value) {
+  return acScore.value?.ticket?.ac_value === value
+}
+
+async function loadAc() {
+  const token = ++acToken
+  acBoardLoading.value = true
+  const params = acWindows()
+  try {
+    const body = await getAc(type.value, params)
+    if (token !== acToken) return
+    acPulse.value = body
+    acScore.value = null
+    acError.value = ''
+  } catch (e) {
+    if (token !== acToken) return
+    acPulse.value = null
+    acScore.value = null
+    acError.value = e.message || 'AC值加载失败'
+  } finally {
+    if (token === acToken) acBoardLoading.value = false
+  }
+}
+
+async function runAc() {
+  acLoading.value = true
+  acError.value = ''
+  const params = acWindows()
+  try {
+    const main = splitNums(acMain.value)
+    const special = echoField.value.specialLabel ? splitNums(acSpecial.value) : []
+    const body = await postAc(type.value, { main, special, ...params })
+    acPulse.value = body
+    acScore.value = body
+  } catch (e) {
+    acScore.value = null
+    acError.value = e.message || '打分失败'
+  } finally {
+    acLoading.value = false
+  }
+}
+
+async function fillLatestAc() {
+  acError.value = ''
+  if (!acPulse.value) await loadAc()
+  const latest = acPulse.value?.latest_draw
+  if (!latest) {
+    acScore.value = null
+    acError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  acMain.value = (latest.main || []).join(' ')
+  acSpecial.value = (latest.special || []).join(' ')
+  await runAc()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -4193,6 +4449,14 @@ function load() {
   tailLimit.value = 80
   tailShort.value = 10
   tailLong.value = 50
+  acPulse.value = null
+  acScore.value = null
+  acError.value = ''
+  acMain.value = ''
+  acSpecial.value = ''
+  acLimit.value = 80
+  acShort.value = 10
+  acLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -4207,6 +4471,7 @@ function load() {
   loadPrime()
   loadZone()
   loadTail()
+  loadAc()
 }
 
 watch(periods, () => {

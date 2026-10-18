@@ -143,7 +143,7 @@ def test_tail_constants_distinguish_the_metric():
     assert "尾数" in SET_NOTE and "特别号" in SET_NOTE
     assert "0" in DIGIT_NOTE and "9" in DIGIT_NOTE
     keys = [item.key for item in PULSE_MODULES]
-    assert keys[-1] == "tail"
+    assert "tail" in keys
     assert [item.label for item in PULSE_MODULES if item.key == "tail"] == ["尾数"]
     assert ("app.services.tail", "tail_summary") in _MEMO_TARGETS
 
