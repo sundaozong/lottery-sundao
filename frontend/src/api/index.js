@@ -164,6 +164,15 @@ export const api = {
     return request(`/api/analysis/${type}/zhenfu?${params}`)
   },
   zhenfuScore: (type, body) => request(`/api/analysis/${type}/zhenfu/score`, { method: 'POST', body: JSON.stringify(body) }),
+  junzhi: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/junzhi?${params}`)
+  },
+  junzhiScore: (type, body) => request(`/api/analysis/${type}/junzhi/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -299,6 +308,14 @@ export function getZhenfu(type, params) {
 
 export function postZhenfu(type, body) {
   return api.zhenfuScore(type, body)
+}
+
+export function getJunzhi(type, params) {
+  return api.junzhi(type, params)
+}
+
+export function postJunzhi(type, body) {
+  return api.junzhiScore(type, body)
 }
 
 export async function downloadRecords() {
