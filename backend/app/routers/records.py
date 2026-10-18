@@ -4,12 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import PurchaseRecord
-from ..schemas import RecordIn, RecordUpdate
-from ..lotteries import LOTTERIES, load_bet
+from ..lotteries import LOTTERIES, load_bet, normalize_type
+from ..models import Draw, PurchaseRecord
+from ..schemas import RecordIn, RecordUpdate, RecordVerifyIn
 from ..services.ledger import monthly_summary, parse_day, records_csv, rhythm
-from ..services.prize import canonical_bet, play_name
+from ..services.prize import calculate, canonical_bet, play_name
 from ..services.seed import ensure_seed
+
+VERIFY_DISCLAIMER = "奖金为示意金额，浮动奖未按当期奖池计算。请以官方开奖与兑奖规则为准。"
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
@@ -84,6 +86,106 @@ def export_records(db: Session = Depends(get_db)):
             "Content-Disposition": "attachment; filename=records.csv; filename*=UTF-8''%E8%B4%AD%E4%B9%B0%E8%AE%B0%E5%BD%95.csv"
         },
     )
+
+
+def _same_money(left, right) -> bool:
+    return round(float(left or 0), 2) == round(float(right or 0), 2)
+
+
+def _verify_item(row: PurchaseRecord, status: str, new_prize, **extra) -> dict:
+    item = {
+        "id": row.id,
+        "lottery_type": row.lottery_type,
+        "issue": row.issue or "",
+        "old_prize": row.prize,
+        "new_prize": new_prize,
+        "status": status,
+    }
+    item.update(extra)
+    return item
+
+
+def _draw_index(db: Session) -> dict[tuple[str, str], Draw]:
+    index: dict[tuple[str, str], Draw] = {}
+    for draw in db.query(Draw).all():
+        index[(normalize_type(draw.lottery_type), (draw.issue or "").strip())] = draw
+    return index
+
+
+@router.post("/verify")
+def verify_records(body: RecordVerifyIn | None = None, db: Session = Depends(get_db)):
+    """按彩种 + 期号对照本地开奖，重算奖金。默认只预览，apply 时只改 prize。"""
+    if body is None:
+        body = RecordVerifyIn()
+    ensure_seed(db)
+    query = db.query(PurchaseRecord)
+    if body.record_ids is not None:
+        if not body.record_ids:
+            rows: list[PurchaseRecord] = []
+        else:
+            rows = (
+                query.filter(PurchaseRecord.id.in_(body.record_ids))
+                .order_by(PurchaseRecord.id.asc())
+                .all()
+            )
+    else:
+        rows = query.order_by(PurchaseRecord.id.asc()).all()
+
+    draws = _draw_index(db) if rows else {}
+    items: list[dict] = []
+    wrote = False
+    for row in rows:
+        issue = (row.issue or "").strip()
+        if not issue:
+            items.append(_verify_item(row, "no_issue", None))
+            continue
+        draw = draws.get((normalize_type(row.lottery_type), issue))
+        if draw is None:
+            items.append(_verify_item(row, "no_draw", None))
+            continue
+        bet = load_bet(row.numbers)
+        try:
+            result = calculate(
+                row.lottery_type,
+                bet,
+                draw.numbers,
+                multiple=int(bet.get("multiple") or 1),
+                play=bet.get("play") or None,
+                pick=bet.get("pick"),
+            )
+        except Exception as exc:
+            message = str(exc).strip() or "无法计算奖金"
+            items.append(_verify_item(row, "error", None, message=message))
+            continue
+        amount = round(float(result.get("amount") or 0), 2)
+        detail = {
+            "level": result.get("level") or "",
+            "main_hit": result.get("main_hit"),
+            "special_hit": result.get("special_hit"),
+        }
+        if _same_money(row.prize, amount):
+            items.append(_verify_item(row, "unchanged", amount, **detail))
+            continue
+        if not body.apply:
+            items.append(_verify_item(row, "preview", amount, **detail))
+            continue
+        items.append(_verify_item(row, "updated", amount, **detail))
+        row.prize = amount
+        wrote = True
+
+    if wrote:
+        db.commit()
+
+    counts = {"updated": 0, "preview": 0, "unchanged": 0, "no_issue": 0, "no_draw": 0, "error": 0}
+    for item in items:
+        if item["status"] in counts:
+            counts[item["status"]] += 1
+    return {
+        "apply": body.apply,
+        "disclaimer": VERIFY_DISCLAIMER,
+        "summary": {"total": len(items), **counts},
+        "items": items,
+    }
 
 
 def _store_numbers(lottery_type: str, numbers) -> str:

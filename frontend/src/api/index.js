@@ -193,6 +193,7 @@ export const api = {
     return request('/api/predict', { method: 'POST', body: JSON.stringify(payload) })
   },
   records: () => request('/api/records'),
+  verifyRecords: (body = {}) => request('/api/records/verify', { method: 'POST', body: JSON.stringify(body) }),
   recordMonths: () => request('/api/records/monthly'),
   rhythm: () => request('/api/records/rhythm'),
   createRecord: (body) => request('/api/records', { method: 'POST', body: JSON.stringify(body) }),
