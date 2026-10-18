@@ -119,6 +119,15 @@ export const api = {
     return request(`/api/analysis/${type}/tail?${params}`)
   },
   tailScore: (type, body) => request(`/api/analysis/${type}/tail/score`, { method: 'POST', body: JSON.stringify(body) }),
+  ac: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/ac?${params}`)
+  },
+  acScore: (type, body) => request(`/api/analysis/${type}/ac/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -214,6 +223,14 @@ export function getTail(type, params) {
 
 export function postTail(type, body) {
   return api.tailScore(type, body)
+}
+
+export function getAc(type, params) {
+  return api.ac(type, params)
+}
+
+export function postAc(type, body) {
+  return api.acScore(type, body)
 }
 
 export async function downloadRecords() {
