@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a> · <a href="#zhenfu-pulse">振幅</a></p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a> · <a href="#zhenfu-pulse">振幅</a> · <a href="#junzhi-pulse">均值</a></p>
       </div>
     </div>
 
@@ -2980,6 +2980,158 @@
       </div>
     </div>
 
+    <div class="mb-4" id="junzhi-pulse">
+      <div class="section-head">
+        <span>均值脉动</span>
+        <span class="sub">短窗对比长窗 · 主号算术平均 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ junzhi?.disclaimer || '均值脉动看主号算术平均的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="junzhiLimit" class="form-input mono" type="number" min="5" max="200" @keydown.enter="loadJunzhi" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="junzhiShort" class="form-input mono" type="number" min="5" max="30" @keydown.enter="loadJunzhi" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="junzhiLong" class="form-input mono" type="number" min="20" max="200" @keydown.enter="loadJunzhi" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="junzhiMain" class="form-input mono" :placeholder="echoField.main" @keydown.enter="runJunzhi" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="junzhiSpecial" class="form-input mono" :placeholder="echoField.special" @keydown.enter="runJunzhi" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="junzhiBoardLoading" @click="loadJunzhi">
+            <AppIcon v-if="junzhiBoardLoading" name="sync" :size="14" class="spin" />
+            {{ junzhiBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="junzhiLoading" @click="runJunzhi">
+            <AppIcon v-if="junzhiLoading" name="sync" :size="14" class="spin" />
+            {{ junzhiLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="junzhiLoading" @click="fillLatestJunzhi">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ junzhiHint }}</p>
+        <p v-if="junzhiError" class="bet-error">{{ junzhiError }}</p>
+
+        <div v-if="junzhiBoardLoading && !junzhi" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计均值…
+        </div>
+        <div v-else-if="junzhi" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ junzhi.sample_size }} 期 · 平均 {{ spanStat(junzhi.mean) }} · 中位 {{ spanStat(junzhi.median) }}
+            · 短窗 {{ spanStat(junzhi.short_avg) }} · 长窗 {{ spanStat(junzhi.long_avg) }} · 脉动 {{ spanSigned(junzhi.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(junzhi.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ junzhi.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="junzhi.drift || 'flat'">{{ junzhiDriftLabel(junzhi.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(junzhi.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ junzhi.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="junzhi.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ junzhi.latest_draw.issue }} 期</span>
+                <span>均值 {{ spanStat(junzhi.latest_draw.mean_value) }}</span>
+              </div>
+              <NumberBalls :numbers="junzhi.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!junzhi.sample_size" class="empty">
+            <div class="empty-title">暂无对照</div>
+            <div class="empty-desc">有开奖后，这里会看主号均值，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              均值
+              <span class="sub">{{ junzhi.basis === 'digits' ? '按位取平均，保留重复，不排序' : '主号去重后取算术平均' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in junzhiBars" :key="bucket.mean_value" class="span-bar" :class="{ 'is-current': junzhiCurrent(bucket.mean_value) }">
+                <span class="mono">{{ spanStat(bucket.mean_value) }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, junzhi.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <div v-if="junzhi.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in junzhi.common" :key="'jz' + item.mean_value" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="span-meta">{{ spanStat(item.mean_value) }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="junzhi.special" class="span-pos">
+              <div class="card-title">{{ junzhi.special.label }} <span class="sub">有特别号就另算均值，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ junzhi.special.sample_size }} 期 · 短窗 {{ spanStat(junzhi.special.short_avg) }} · 长窗 {{ spanStat(junzhi.special.long_avg) }}
+                · {{ junzhiDriftLabel(junzhi.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in junzhiSpecialBars" :key="'jzs' + bucket.mean_value" class="span-bar">
+                  <span class="mono">{{ spanStat(bucket.mean_value) }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, junzhi.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="junzhiScore" class="span-score">
+            <div class="card-title">这注的均值</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(junzhiScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(junzhiScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ junzhiScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanStat(junzhiScore.ticket.mean_value) }}</div>
+                <div class="text-xs text-muted">均值</div>
+              </div>
+            </div>
+            <div v-if="junzhiSpecialScored" class="span-pos">
+              <div class="card-title">{{ junzhi.special?.label || '特别号' }} <span class="sub">这注的特别号均值，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ junzhiScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanStat(junzhiScore.special_ticket.mean_value) }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(junzhiScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -3148,7 +3300,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao, getShengping, postShengping, getZhenfu, postZhenfu } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao, getShengping, postShengping, getZhenfu, postZhenfu, getJunzhi, postJunzhi } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -3408,6 +3560,17 @@ const zhenfuError = ref('')
 const zhenfuLoading = ref(false)
 const zhenfuBoardLoading = ref(false)
 let zhenfuToken = 0
+const junzhiLimit = ref(80)
+const junzhiShort = ref(10)
+const junzhiLong = ref(50)
+const junzhiMain = ref('')
+const junzhiSpecial = ref('')
+const junzhi = ref(null)
+const junzhiScore = ref(null)
+const junzhiError = ref('')
+const junzhiLoading = ref(false)
+const junzhiBoardLoading = ref(false)
+let junzhiToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -3611,6 +3774,14 @@ const zhenfuHint = computed(() => (
 const zhenfuBars = computed(() => pulseVisibleBars(zhenfu.value?.distribution, 'amplitude_sum'))
 const zhenfuSpecialBars = computed(() => pulseVisibleBars(zhenfu.value?.special?.distribution, 'amplitude_sum'))
 const zhenfuSpecialScored = computed(() => zhenfuScore.value?.special_ticket?.amplitude_sum != null)
+const junzhiHint = computed(() => (
+  echoField.value.digit
+    ? '按抽出的各位取算术平均，保留重复和位置，不排序。均值保留两位小数。特别号不计入主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+    : '主号去重后取算术平均，重复只算一次。特别号另算，不并进主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+))
+const junzhiBars = computed(() => pulseVisibleBars(junzhi.value?.distribution, 'mean_value'))
+const junzhiSpecialBars = computed(() => pulseVisibleBars(junzhi.value?.special?.distribution, 'mean_value'))
+const junzhiSpecialScored = computed(() => junzhiScore.value?.special_ticket?.mean_value != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -5223,6 +5394,86 @@ async function fillLatestZhenfu() {
   await runZhenfu()
 }
 
+function junzhiWindows() {
+  let limit = Math.round(Number(junzhiLimit.value))
+  let short = Math.round(Number(junzhiShort.value))
+  let long = Math.round(Number(junzhiLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  junzhiLimit.value = limit
+  junzhiShort.value = short
+  junzhiLong.value = long
+  return { limit, short, long }
+}
+
+function junzhiDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function junzhiCurrent(value) {
+  return Number(junzhiScore.value?.ticket?.mean_value) === Number(value)
+}
+
+async function loadJunzhi() {
+  const token = ++junzhiToken
+  junzhiBoardLoading.value = true
+  const params = junzhiWindows()
+  try {
+    const body = await getJunzhi(type.value, params)
+    if (token !== junzhiToken) return
+    junzhi.value = body
+    junzhiScore.value = null
+    junzhiError.value = ''
+  } catch (e) {
+    if (token !== junzhiToken) return
+    junzhi.value = null
+    junzhiScore.value = null
+    junzhiError.value = e.message || '均值加载失败'
+  } finally {
+    if (token === junzhiToken) junzhiBoardLoading.value = false
+  }
+}
+
+async function runJunzhi() {
+  junzhiLoading.value = true
+  junzhiError.value = ''
+  const params = junzhiWindows()
+  try {
+    const main = splitNums(junzhiMain.value)
+    const special = echoField.value.specialLabel ? splitNums(junzhiSpecial.value) : []
+    const body = await postJunzhi(type.value, { main, special, ...params })
+    junzhi.value = body
+    junzhiScore.value = body
+  } catch (e) {
+    junzhiScore.value = null
+    junzhiError.value = e.message || '打分失败'
+  } finally {
+    junzhiLoading.value = false
+  }
+}
+
+async function fillLatestJunzhi() {
+  junzhiError.value = ''
+  if (!junzhi.value) await loadJunzhi()
+  const latest = junzhi.value?.latest_draw
+  if (!latest) {
+    junzhiScore.value = null
+    junzhiError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  junzhiMain.value = (latest.main || []).join(' ')
+  junzhiSpecial.value = (latest.special || []).join(' ')
+  await runJunzhi()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -5510,6 +5761,14 @@ function load() {
   zhenfuLimit.value = 80
   zhenfuShort.value = 10
   zhenfuLong.value = 50
+  junzhi.value = null
+  junzhiScore.value = null
+  junzhiError.value = ''
+  junzhiMain.value = ''
+  junzhiSpecial.value = ''
+  junzhiLimit.value = 80
+  junzhiShort.value = 10
+  junzhiLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -5529,6 +5788,7 @@ function load() {
   loadDaxiao()
   loadShengping()
   loadZhenfu()
+  loadJunzhi()
 }
 
 watch(periods, () => {

@@ -447,6 +447,91 @@ class ZhenfuScoreOut(ZhenfuOut):
     special_ticket: ZhenfuTicket
 
 
+class JunzhiIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    short: int = Field(default=10, ge=5, le=30)
+    long: int = Field(default=50, ge=20, le=200)
+
+
+class JunzhiBucket(BaseModel):
+    mean_value: float
+    count: int
+    rate: float
+
+
+class JunzhiCommon(BaseModel):
+    mean_value: float
+    count: int
+    rate: float
+
+
+class JunzhiLatest(BaseModel):
+    issue: str
+    draw_date: str = ""
+    main: list[str]
+    special: list[str]
+    mean_value: Optional[float] = None
+    special_mean_value: Optional[float] = None
+
+
+class JunzhiBlock(BaseModel):
+    label: str
+    sample_size: int
+    distribution: list[JunzhiBucket]
+    common: list[JunzhiCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+
+
+class JunzhiTicket(BaseModel):
+    mean_value: Optional[float] = None
+    percentile: Optional[float] = None
+    typicality: Optional[float] = None
+    rarity: Optional[str] = None
+    alignment: Optional[str] = None
+    note: str = ""
+
+
+class JunzhiQuery(BaseModel):
+    main: list[str]
+    special: list[str]
+
+
+class JunzhiOut(BaseModel):
+    lottery_type: str
+    mode: str
+    basis: str
+    sample_size: int
+    short: int
+    long: int
+    threshold: float
+    distribution: list[JunzhiBucket]
+    common: list[JunzhiCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+    note: str
+    latest_draw: Optional[JunzhiLatest] = None
+    special: Optional[JunzhiBlock] = None
+    data_status: str
+    disclaimer: str
+
+
+class JunzhiScoreOut(JunzhiOut):
+    query: JunzhiQuery
+    ticket: JunzhiTicket
+    special_ticket: JunzhiTicket
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None
@@ -466,7 +551,7 @@ class PredictIn(BaseModel):
     count: int = Field(default=1, ge=1, le=10)
     weights: Optional[dict[str, float]] = Field(
         default=None,
-        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping、zhenfu。",
+        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping、zhenfu、junzhi。",
     )
 
 

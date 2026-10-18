@@ -31,6 +31,7 @@ from .hewei import score_hewei
 from .daxiao import score_daxiao
 from .shengping import score_shengping
 from .zhenfu import score_zhenfu
+from .junzhi import score_junzhi
 from .tail import score_tail
 from .zone import score_zone
 from .repeat import score_repeat
@@ -78,6 +79,7 @@ _MEMO_TARGETS = (
     ("app.services.daxiao", "daxiao_summary"),
     ("app.services.shengping", "shengping_summary"),
     ("app.services.zhenfu", "zhenfu_summary"),
+    ("app.services.junzhi", "junzhi_summary"),
 )
 
 
@@ -105,6 +107,7 @@ PULSE_MODULES = [
     PulseModule("daxiao", "大小", score_daxiao),
     PulseModule("shengping", "升平降", score_shengping),
     PulseModule("zhenfu", "振幅", score_zhenfu),
+    PulseModule("junzhi", "均值", score_junzhi),
 ]
 
 

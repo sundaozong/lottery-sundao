@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/predict", tags=["predict"])
     summary="生成娱乐推荐",
     description=(
         "strategy 为 hot、cold、hybrid、random 时按历史频次抽样。"
-        "strategy=pulse（脉动综合）生成一批候选票，调用重号、动量、邻号、跨度、连号簇、012路、和值、奇偶、质合、区位、尾数、AC值、和尾、大小、升平降的现有打分函数，"
+        "strategy=pulse（脉动综合）生成一批候选票，调用重号、动量、邻号、跨度、连号簇、012路、和值、奇偶、质合、区位、尾数、AC值、和尾、大小、升平降、振幅、均值的现有打分函数，"
         "等权（或按 weights）合成总分后返回前 count 注。分数只对照近期形态，不代表预测能力。"
         "仅供娱乐，不构成投注建议。"
     ),
