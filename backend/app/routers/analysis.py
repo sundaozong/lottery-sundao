@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas import AcIn, ClusterIn, CollisionIn, DaxiaoIn, DaxiaoOut, DaxiaoScoreOut, EchoIn, HeweiIn, MomentumIn, NeighborIn, ParityIn, PrimeIn, RepeatIn, RoadIn, ShengpingIn, ShengpingOut, ShengpingScoreOut, SpanIn, SumIn, TailIn, ZoneIn
+from ..schemas import AcIn, ClusterIn, CollisionIn, DaxiaoIn, DaxiaoOut, DaxiaoScoreOut, EchoIn, HeweiIn, MomentumIn, NeighborIn, ParityIn, PrimeIn, RepeatIn, RoadIn, ShengpingIn, ShengpingOut, ShengpingScoreOut, SpanIn, SumIn, TailIn, ZhenfuIn, ZhenfuOut, ZhenfuScoreOut, ZoneIn
 from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
 from ..services.collision import collide, collide_records
@@ -18,6 +18,7 @@ from ..services.ac import ac_summary, score_ac
 from ..services.hewei import hewei_summary, score_hewei
 from ..services.daxiao import daxiao_summary, score_daxiao
 from ..services.shengping import score_shengping, shengping_summary
+from ..services.zhenfu import score_zhenfu, zhenfu_summary
 from ..services.tail import score_tail, tail_summary
 from ..services.zone import score_zone, zone_summary
 from ..services.sum_pulse import score_sum, sum_summary
@@ -568,6 +569,44 @@ def post_shengping(lottery_type: str, body: ShengpingIn, db: Session = Depends(g
     ensure_seed(db)
     try:
         return score_shengping(
+            db,
+            normalize_type(lottery_type),
+            body.main,
+            body.special,
+            limit=body.limit,
+            short=body.short,
+            long=body.long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/{lottery_type}/zhenfu", response_model=ZhenfuOut)
+def get_zhenfu(
+    lottery_type: str,
+    limit: int = Query(80, ge=5, le=200),
+    short: int = Query(10, ge=5, le=30),
+    long: int = Query(50, ge=20, le=200),
+    db: Session = Depends(get_db),
+):
+    ensure_seed(db)
+    try:
+        return zhenfu_summary(
+            db,
+            normalize_type(lottery_type),
+            limit=limit,
+            short=short,
+            long=long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/{lottery_type}/zhenfu/score", response_model=ZhenfuScoreOut)
+def post_zhenfu(lottery_type: str, body: ZhenfuIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    try:
+        return score_zhenfu(
             db,
             normalize_type(lottery_type),
             body.main,
