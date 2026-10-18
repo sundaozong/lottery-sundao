@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数</p>
       </div>
     </div>
 
@@ -2063,6 +2063,160 @@
       </div>
     </div>
 
+    <div class="mb-4" id="tail-pulse">
+      <div class="section-head">
+        <span>尾数脉动</span>
+        <span class="sub">短窗对比长窗 · 尾数种类更散与更集中 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ tail?.disclaimer || '尾数脉动看主号不重复尾数的种类数，以及短窗相对长窗是更散还是更集中，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="tailLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="tailShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="tailLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="tailMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="tailSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="tailBoardLoading" @click="loadTail">
+            <AppIcon v-if="tailBoardLoading" name="sync" :size="14" class="spin" />
+            {{ tailBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="tailLoading" @click="runTail">
+            <AppIcon v-if="tailLoading" name="sync" :size="14" class="spin" />
+            {{ tailLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="tailLoading" @click="fillLatestTail">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ tailHint }}</p>
+        <p v-if="tailError" class="bet-error">{{ tailError }}</p>
+
+        <div v-if="tailBoardLoading && !tail" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计尾数…
+        </div>
+        <div v-else-if="tail" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ tail.sample_size }} 期 · 平均 {{ spanStat(tail.mean) }} · 中位 {{ spanStat(tail.median) }}
+            · 短窗 {{ spanStat(tail.short_avg) }} · 长窗 {{ spanStat(tail.long_avg) }} · 脉动 {{ spanSigned(tail.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(tail.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ tail.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="tail.drift || 'flat'">{{ tailDriftLabel(tail.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(tail.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ tail.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="tail.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ tail.latest_draw.issue }} 期</span>
+                <span>尾数 {{ tailSpeak(tail.latest_draw.tails) }} · 种类 {{ tail.latest_draw.unique_tail_count }}</span>
+              </div>
+              <NumberBalls :numbers="tail.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!tail.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看主号有几种尾数，以及短窗相对长窗是更散还是更集中。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              尾数种类
+              <span class="sub">{{ tail.basis === 'digits' ? '整注各位本身就是尾数，0 和 9 不绕圈' : '主号去重后取个位，同一尾数只算一种' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in tailBars" :key="bucket.unique_tail_count" class="span-bar" :class="{ 'is-current': tailCurrent(bucket.unique_tail_count) }">
+                <span class="mono">{{ bucket.unique_tail_count }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, tail.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <p v-if="tailBarsCollapsed" class="text-xs text-muted">尾数种类拉得比较开，这里只展开出现过的档。</p>
+            <div v-if="tail.common?.length" class="span-band">
+              <span class="span-tag">常见组合</span>
+              <div class="balls">
+                <span v-for="item in tail.common" :key="'t' + item.pattern" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="span-meta">{{ tailSpeak(item.tails) }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="tail.special" class="span-pos">
+              <div class="card-title">{{ tail.special.label }} <span class="sub">有特别号就另计尾数，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ tail.special.sample_size }} 期 · 短窗 {{ spanStat(tail.special.short_avg) }} · 长窗 {{ spanStat(tail.special.long_avg) }}
+                · {{ tailDriftLabel(tail.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in tailSpecialBars" :key="'ts' + bucket.unique_tail_count" class="span-bar">
+                  <span class="mono">{{ bucket.unique_tail_count }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, tail.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="tailScore" class="span-score">
+            <div class="card-title">这注的尾数</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(tailScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(tailScore.ticket.alignment) }}</span>
+                  <span v-if="tailScore.ticket.tails">尾数 {{ tailSpeak(tailScore.ticket.tails) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ tailScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ tailScore.ticket.unique_tail_count }}</div>
+                <div class="text-xs text-muted">尾数种类</div>
+              </div>
+            </div>
+            <div v-if="tailSpecialScored" class="span-pos">
+              <div class="card-title">{{ tail.special?.label || '特别号' }} <span class="sub">这注的特别号尾数，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ tailScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ tailScore.special_ticket.unique_tail_count }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(tailScore.special_ticket.rarity) }} · {{ tailSpeak(tailScore.special_ticket.tails) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -2231,7 +2385,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -2425,6 +2579,17 @@ const zoneError = ref('')
 const zoneLoading = ref(false)
 const zoneBoardLoading = ref(false)
 let zoneToken = 0
+const tailLimit = ref(80)
+const tailShort = ref(10)
+const tailLong = ref(50)
+const tailMain = ref('')
+const tailSpecial = ref('')
+const tail = ref(null)
+const tailScore = ref(null)
+const tailError = ref('')
+const tailLoading = ref(false)
+const tailBoardLoading = ref(false)
+let tailToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -2567,6 +2732,18 @@ const zoneBarsCollapsed = computed(() => {
 })
 const zoneSpecialBars = computed(() => pulseVisibleBars(zone.value?.special?.distribution, 'imbalance'))
 const zoneSpecialScored = computed(() => zoneScore.value?.special_ticket?.imbalance != null)
+const tailHint = computed(() => (
+  echoField.value.digit
+    ? '整注各位数字本身就是尾数，种类是不重复的数字个数，0 和 9 不绕圈。特别号不计入主号。短窗平均比长窗高出 0.5 算更散。仅供娱乐，不构成投注建议。'
+    : '主号去重后取个位，同一尾数只算一种，不是 012 路，也不是区位、跨度或和值。特别号不并进去。短窗平均比长窗高出 0.5 算更散。仅供娱乐，不构成投注建议。'
+))
+const tailBars = computed(() => pulseVisibleBars(tail.value?.distribution, 'unique_tail_count'))
+const tailBarsCollapsed = computed(() => {
+  const rows = tail.value?.distribution || []
+  return tailBars.value.length < rows.length
+})
+const tailSpecialBars = computed(() => pulseVisibleBars(tail.value?.special?.distribution, 'unique_tail_count'))
+const tailSpecialScored = computed(() => tailScore.value?.special_ticket?.unique_tail_count != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -3685,6 +3862,90 @@ async function runZone() {
   }
 }
 
+function tailWindows() {
+  let limit = Math.round(Number(tailLimit.value))
+  let short = Math.round(Number(tailShort.value))
+  let long = Math.round(Number(tailLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  tailLimit.value = limit
+  tailShort.value = short
+  tailLong.value = long
+  return { limit, short, long }
+}
+
+function tailDriftLabel(drift) {
+  if (drift === 'rising') return '更散'
+  if (drift === 'falling') return '更集中'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function tailSpeak(tails) {
+  return (tails || []).join('、') || '—'
+}
+
+function tailCurrent(value) {
+  return tailScore.value?.ticket?.unique_tail_count === value
+}
+
+async function loadTail() {
+  const token = ++tailToken
+  tailBoardLoading.value = true
+  const params = tailWindows()
+  try {
+    const body = await getTail(type.value, params)
+    if (token !== tailToken) return
+    tail.value = body
+    tailScore.value = null
+    tailError.value = ''
+  } catch (e) {
+    if (token !== tailToken) return
+    tail.value = null
+    tailScore.value = null
+    tailError.value = e.message || '尾数加载失败'
+  } finally {
+    if (token === tailToken) tailBoardLoading.value = false
+  }
+}
+
+async function runTail() {
+  tailLoading.value = true
+  tailError.value = ''
+  const params = tailWindows()
+  try {
+    const main = splitNums(tailMain.value)
+    const special = echoField.value.specialLabel ? splitNums(tailSpecial.value) : []
+    const body = await postTail(type.value, { main, special, ...params })
+    tail.value = body
+    tailScore.value = body
+  } catch (e) {
+    tailScore.value = null
+    tailError.value = e.message || '打分失败'
+  } finally {
+    tailLoading.value = false
+  }
+}
+
+async function fillLatestTail() {
+  tailError.value = ''
+  if (!tail.value) await loadTail()
+  const latest = tail.value?.latest_draw
+  if (!latest) {
+    tailScore.value = null
+    tailError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  tailMain.value = (latest.main || []).join(' ')
+  tailSpecial.value = (latest.special || []).join(' ')
+  await runTail()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -3924,6 +4185,14 @@ function load() {
   zoneLimit.value = 80
   zoneShort.value = 10
   zoneLong.value = 50
+  tail.value = null
+  tailScore.value = null
+  tailError.value = ''
+  tailMain.value = ''
+  tailSpecial.value = ''
+  tailLimit.value = 80
+  tailShort.value = 10
+  tailLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -3937,6 +4206,7 @@ function load() {
   loadParity()
   loadPrime()
   loadZone()
+  loadTail()
 }
 
 watch(periods, () => {
