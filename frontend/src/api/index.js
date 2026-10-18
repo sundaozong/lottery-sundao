@@ -137,6 +137,15 @@ export const api = {
     return request(`/api/analysis/${type}/hewei?${params}`)
   },
   heweiScore: (type, body) => request(`/api/analysis/${type}/hewei/score`, { method: 'POST', body: JSON.stringify(body) }),
+  daxiao: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/daxiao?${params}`)
+  },
+  daxiaoScore: (type, body) => request(`/api/analysis/${type}/daxiao/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -248,6 +257,14 @@ export function getHewei(type, params) {
 
 export function postHewei(type, body) {
   return api.heweiScore(type, body)
+}
+
+export function getDaxiao(type, params) {
+  return api.daxiao(type, params)
+}
+
+export function postDaxiao(type, body) {
+  return api.daxiaoScore(type, body)
 }
 
 export async function downloadRecords() {

@@ -167,6 +167,104 @@ class HeweiIn(BaseModel):
     long: int = Field(default=50, ge=20, le=200)
 
 
+class DaxiaoIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    short: int = Field(default=10, ge=5, le=30)
+    long: int = Field(default=50, ge=20, le=200)
+
+
+class DaxiaoBoundary(BaseModel):
+    lo: int
+    hi: int
+    mid: int
+
+
+class DaxiaoBucket(BaseModel):
+    big_count: int
+    count: int
+    rate: float
+
+
+class DaxiaoCommon(BaseModel):
+    big_count: int
+    small_count: int
+    ratio: str
+    count: int
+    rate: float
+
+
+class DaxiaoLatest(BaseModel):
+    issue: str
+    draw_date: str = ""
+    main: list[str]
+    special: list[str]
+    big_count: int
+    small_count: int
+    special_big_count: Optional[int] = None
+    special_small_count: Optional[int] = None
+
+
+class DaxiaoBlock(BaseModel):
+    label: str
+    sample_size: int
+    distribution: list[DaxiaoBucket]
+    common: list[DaxiaoCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+    boundary: DaxiaoBoundary
+
+
+class DaxiaoTicket(BaseModel):
+    big_count: Optional[int] = None
+    small_count: Optional[int] = None
+    percentile: Optional[float] = None
+    typicality: Optional[float] = None
+    rarity: Optional[str] = None
+    alignment: Optional[str] = None
+    note: str = ""
+
+
+class DaxiaoQuery(BaseModel):
+    main: list[str]
+    special: list[str]
+
+
+class DaxiaoOut(BaseModel):
+    lottery_type: str
+    mode: str
+    basis: str
+    sample_size: int
+    short: int
+    long: int
+    threshold: float
+    distribution: list[DaxiaoBucket]
+    common: list[DaxiaoCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+    boundary: DaxiaoBoundary
+    note: str
+    latest_draw: Optional[DaxiaoLatest] = None
+    special: Optional[DaxiaoBlock] = None
+    data_status: str
+    disclaimer: str
+
+
+class DaxiaoScoreOut(DaxiaoOut):
+    query: DaxiaoQuery
+    ticket: DaxiaoTicket
+    special_ticket: DaxiaoTicket
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None
@@ -186,7 +284,7 @@ class PredictIn(BaseModel):
     count: int = Field(default=1, ge=1, le=10)
     weights: Optional[dict[str, float]] = Field(
         default=None,
-        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei。",
+        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao。",
     )
 
 
