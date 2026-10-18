@@ -30,7 +30,7 @@
     <div class="card mb-4">
       <div class="card-title">
         开奖结果
-        <span class="sub">{{ TYPE_NAMES[type] }} · 基本走势（开出为彩球，灰字为遗漏）</span>
+        <span class="sub">{{ TYPE_NAMES[type] }} · 基本走势（开出为彩球，灰字为遗漏，点选可加入选号篮）</span>
       </div>
       <div v-if="drawsLoading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />加载开奖…</div>
       <TrendChart
