@@ -14,7 +14,70 @@
       <div class="trend-legend">
         <span class="ball xs" :class="mainBallClass">红</span> 开出
         <span class="ball xs" :class="specialBallClass">蓝</span> 特别号
-        <span class="trend-omit-sample">12</span> 遗漏
+        <span class="trend-omit-sample heat-3" title="当前窗口里越久未出，颜色越暖">12</span> 遗漏
+      </div>
+    </div>
+
+    <div v-if="rows.length" class="trend-draft">
+      <div class="trend-draft-picks">
+        <template v-if="rule?.mode === 'digit'">
+          <span v-for="(label, i) in rule.positions" :key="label" class="trend-slot">
+            <span class="pos-label">{{ label }}</span>
+            <button
+              v-if="draft.main[i]"
+              type="button"
+              class="ball xs"
+              :class="mainBallClass"
+              :title="'移出' + label"
+              @click="dropAt('main', i)"
+            >{{ draft.main[i] }}</button>
+            <span v-else class="trend-slot-empty">·</span>
+          </span>
+          <template v-if="rule.specMax">
+            <span class="plus">+</span>
+            <span class="trend-slot">
+              <span class="pos-label">{{ rule.specialLabel }}</span>
+              <button
+                v-if="draft.special[0]"
+                type="button"
+                class="ball xs"
+                :class="specialBallClass"
+                :title="'移出' + rule.specialLabel"
+                @click="dropAt('special', 0)"
+              >{{ draft.special[0] }}</button>
+              <span v-else class="trend-slot-empty">·</span>
+            </span>
+          </template>
+        </template>
+        <template v-else>
+          <button
+            v-for="(n, i) in draft.main"
+            :key="'dm' + n + i"
+            type="button"
+            class="ball xs"
+            :class="mainBallClass"
+            title="移出"
+            @click="dropAt('main', i)"
+          >{{ n }}</button>
+          <template v-if="draft.special.length">
+            <span class="plus">+</span>
+            <button
+              v-for="(n, i) in draft.special"
+              :key="'ds' + n + i"
+              type="button"
+              class="ball xs"
+              :class="specialBallClass"
+              title="移出"
+              @click="dropAt('special', i)"
+            >{{ n }}</button>
+          </template>
+          <span v-if="!hasDraft" class="text-sm text-muted">点表头或开出的球</span>
+        </template>
+      </div>
+      <span class="trend-draft-hint">{{ draftState.message }}</span>
+      <div class="trend-draft-actions">
+        <button type="button" class="text-btn" :disabled="!hasDraft" @click="clearDraft">清空</button>
+        <button type="button" class="btn btn-primary btn-sm" :disabled="!draftState.complete" @click="addDraft">加入选号篮</button>
       </div>
     </div>
 
@@ -64,25 +127,35 @@
                   v-for="n in mainPool"
                   :key="'mh' + n"
                   class="num-col"
-                  :class="zoneClass(n)"
-                >{{ n }}</th>
+                  :class="[zoneClass(n), picked('main', n)]"
+                >
+                  <button type="button" class="trend-num-btn" :aria-pressed="isOn('main', n)" @click="onPick('main', n)">{{ n }}</button>
+                </th>
                 <th
                   v-for="n in specialPool"
                   :key="'sh' + n"
                   class="num-col special-head"
-                >{{ n }}</th>
+                  :class="picked('special', n)"
+                >
+                  <button type="button" class="trend-num-btn" :aria-pressed="isOn('special', n)" @click="onPick('special', n)">{{ n }}</button>
+                </th>
               </tr>
             </template>
             <tr v-else>
               <th class="sticky-col">期号</th>
               <th class="sticky-col-2">日期</th>
-              <th v-for="n in mainPool" :key="'mh2' + n" class="num-col">{{ n }}</th>
+              <th v-for="n in mainPool" :key="'mh2' + n" class="num-col" :class="picked('main', n)">
+                <button type="button" class="trend-num-btn" :aria-pressed="isOn('main', n)" @click="onPick('main', n)">{{ n }}</button>
+              </th>
               <th v-if="specialPool.length" class="sep-col"></th>
               <th
                 v-for="n in specialPool"
                 :key="'sh2' + n"
                 class="num-col special-head"
-              >{{ n }}</th>
+                :class="picked('special', n)"
+              >
+                <button type="button" class="trend-num-btn" :aria-pressed="isOn('special', n)" @click="onPick('special', n)">{{ n }}</button>
+              </th>
               <th class="stat-head">和值</th>
               <th class="stat-head">跨度</th>
               <th class="stat-head">奇偶</th>
@@ -97,26 +170,35 @@
                 v-for="n in mainPool"
                 :key="row.issue + 'm' + n"
                 class="num-col"
-                :class="zoneClass(n)"
+                :class="[zoneClass(n), picked('main', n)]"
               >
-                <span v-if="row.mainSet.has(n)" class="ball xs" :class="mainBallClass">{{ n }}</span>
-                <span v-else class="omit">{{ row.mainOmit[n] }}</span>
+                <button
+                  v-if="row.mainSet.has(n)"
+                  type="button"
+                  class="ball xs"
+                  :class="mainBallClass"
+                  @click="onPick('main', n)"
+                >{{ n }}</button>
+                <span v-else :class="heatClass(row.mainOmit[n], mainOmitMax)">{{ row.mainOmit[n] }}</span>
               </td>
               <td v-if="specialPool.length" class="sep-col"></td>
               <td
                 v-for="n in specialPool"
                 :key="row.issue + 's' + n"
                 class="num-col blue-cell"
+                :class="picked('special', n)"
                 :data-n="n"
                 :data-hit="row.specialSet.has(n) ? '1' : '0'"
               >
-                <span
+                <button
                   v-if="row.specialSet.has(n)"
+                  type="button"
                   class="ball xs blue-hit"
                   :class="specialBallClass"
                   :data-blue-anchor="row.issue"
-                >{{ n }}</span>
-                <span v-else class="omit">{{ row.specialOmit[n] }}</span>
+                  @click="onPick('special', n)"
+                >{{ n }}</button>
+                <span v-else :class="heatClass(row.specialOmit[n], specialOmitMax)">{{ row.specialOmit[n] }}</span>
               </td>
               <td class="stat-cell">{{ row.sum }}</td>
               <td class="stat-cell">{{ row.span }}</td>
@@ -129,30 +211,30 @@
           <tfoot>
             <tr>
               <td class="sticky-col" colspan="2">出现次数</td>
-              <td v-for="n in mainPool" :key="'mc' + n" class="num-col foot">{{ mainCounts[n] || 0 }}</td>
+              <td v-for="n in mainPool" :key="'mc' + n" class="num-col foot" :class="picked('main', n)">{{ mainCounts[n] || 0 }}</td>
               <td v-if="specialPool.length" class="sep-col"></td>
-              <td v-for="n in specialPool" :key="'sc' + n" class="num-col foot">{{ specialCounts[n] || 0 }}</td>
+              <td v-for="n in specialPool" :key="'sc' + n" class="num-col foot" :class="picked('special', n)">{{ specialCounts[n] || 0 }}</td>
               <td class="stat-cell foot" colspan="4"></td>
             </tr>
             <tr>
               <td class="sticky-col" colspan="2">平均遗漏</td>
-              <td v-for="n in mainPool" :key="'ma' + n" class="num-col foot">{{ mainAvgOmit[n] }}</td>
+              <td v-for="n in mainPool" :key="'ma' + n" class="num-col foot" :class="picked('main', n)">{{ mainAvgOmit[n] }}</td>
               <td v-if="specialPool.length" class="sep-col"></td>
-              <td v-for="n in specialPool" :key="'sa' + n" class="num-col foot">{{ specialAvgOmit[n] }}</td>
+              <td v-for="n in specialPool" :key="'sa' + n" class="num-col foot" :class="picked('special', n)">{{ specialAvgOmit[n] }}</td>
               <td class="stat-cell foot" colspan="4"></td>
             </tr>
             <tr>
               <td class="sticky-col" colspan="2">最大遗漏</td>
-              <td v-for="n in mainPool" :key="'mm' + n" class="num-col foot">{{ mainMaxOmit[n] || 0 }}</td>
+              <td v-for="n in mainPool" :key="'mm' + n" class="num-col foot" :class="picked('main', n)">{{ mainMaxOmit[n] || 0 }}</td>
               <td v-if="specialPool.length" class="sep-col"></td>
-              <td v-for="n in specialPool" :key="'sm' + n" class="num-col foot">{{ specialMaxOmit[n] || 0 }}</td>
+              <td v-for="n in specialPool" :key="'sm' + n" class="num-col foot" :class="picked('special', n)">{{ specialMaxOmit[n] || 0 }}</td>
               <td class="stat-cell foot" colspan="4"></td>
             </tr>
             <tr>
               <td class="sticky-col" colspan="2">最大连出</td>
-              <td v-for="n in mainPool" :key="'ml' + n" class="num-col foot">{{ mainMaxStreak[n] || 0 }}</td>
+              <td v-for="n in mainPool" :key="'ml' + n" class="num-col foot" :class="picked('main', n)">{{ mainMaxStreak[n] || 0 }}</td>
               <td v-if="specialPool.length" class="sep-col"></td>
-              <td v-for="n in specialPool" :key="'sl' + n" class="num-col foot">{{ specialMaxStreak[n] || 0 }}</td>
+              <td v-for="n in specialPool" :key="'sl' + n" class="num-col foot" :class="picked('special', n)">{{ specialMaxStreak[n] || 0 }}</td>
               <td class="stat-cell foot" colspan="4"></td>
             </tr>
           </tfoot>
@@ -165,6 +247,18 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ballClass } from '../api'
+import { toast } from '../composables/feedback'
+import { useBasket } from '../composables/useBasket'
+import {
+  emptyTrendDraft,
+  isTrendPicked,
+  omitHeatLevel,
+  omitHeatMax,
+  removeTrendAt,
+  toggleTrendNumber,
+  trendDraftState,
+  trendRule,
+} from '../lib/trendPick'
 
 const props = defineProps({
   type: { type: String, default: 'ssq' },
@@ -175,6 +269,8 @@ const props = defineProps({
 
 defineEmits(['update:periods'])
 
+const basket = useBasket()
+const draft = ref(emptyTrendDraft())
 const tableEl = ref(null)
 const scrollEl = ref(null)
 const blueLine = ref([])
@@ -375,6 +471,57 @@ const mainMaxStreak = computed(() => maxStreak(mainPool.value, 'main'))
 const specialMaxStreak = computed(() => maxStreak(specialPool.value, 'special'))
 const mainAvgOmit = computed(() => avgOmit(mainPool.value, mainCounts.value))
 const specialAvgOmit = computed(() => avgOmit(specialPool.value, specialCounts.value))
+const mainOmitMax = computed(() => omitHeatMax(rows.value, 'mainOmit'))
+const specialOmitMax = computed(() => omitHeatMax(rows.value, 'specialOmit'))
+const rule = computed(() => trendRule(props.type))
+const draftState = computed(() => trendDraftState(props.type, draft.value))
+const hasDraft = computed(() => draft.value.main.length + draft.value.special.length > 0)
+
+function isOn(zone, n) {
+  return isTrendPicked(props.type, draft.value, zone, n)
+}
+
+function picked(zone, n) {
+  return isOn(zone, n) ? 'pick-on' : ''
+}
+
+function heatClass(value, max) {
+  const level = omitHeatLevel(value, max)
+  return level ? ['omit', `heat-${level}`] : ['omit']
+}
+
+function onPick(zone, n) {
+  const result = toggleTrendNumber(props.type, draft.value, zone, n)
+  draft.value = result.draft
+  if ((result.status === 'full' || result.status === 'invalid') && result.message) {
+    toast(result.message, result.status === 'full' ? 'info' : 'error')
+  }
+}
+
+function dropAt(zone, index) {
+  draft.value = removeTrendAt(draft.value, zone, index)
+}
+
+function clearDraft() {
+  draft.value = emptyTrendDraft()
+}
+
+function addDraft() {
+  const state = trendDraftState(props.type, draft.value)
+  if (!state.complete) {
+    toast(state.message, 'info')
+    return
+  }
+  const outcome = basket.add({
+    lottery_type: props.type,
+    numbers: state.numbers,
+    source: 'manual',
+    note: '走势点选',
+  })
+  const kind = outcome.status === 'added' ? 'ok' : outcome.status === 'duplicate' ? 'info' : 'error'
+  toast(outcome.message, kind)
+  if (outcome.status === 'added') draft.value = emptyTrendDraft()
+}
 
 function specialIndex(hit) {
   if (hit == null || hit === '') return -1
@@ -430,6 +577,10 @@ function onScroll() {
 watch([rows, () => props.type, () => props.periods], async () => {
   await nextTick()
   requestAnimationFrame(measureBlueLine)
+})
+
+watch(() => props.type, () => {
+  draft.value = emptyTrendDraft()
 })
 
 onMounted(async () => {
