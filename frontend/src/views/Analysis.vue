@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小</p>
       </div>
     </div>
 
@@ -2522,6 +2522,159 @@
       </div>
     </div>
 
+    <div class="mb-4" id="daxiao-pulse">
+      <div class="section-head">
+        <span>大小脉动</span>
+        <span class="sub">短窗对比长窗 · 大号个数升降 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ daxiao?.disclaimer || '大小脉动看主号大号个数的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="daxiaoLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="daxiaoShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="daxiaoLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="daxiaoMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="daxiaoSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="daxiaoBoardLoading" @click="loadDaxiao">
+            <AppIcon v-if="daxiaoBoardLoading" name="sync" :size="14" class="spin" />
+            {{ daxiaoBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="daxiaoLoading" @click="runDaxiao">
+            <AppIcon v-if="daxiaoLoading" name="sync" :size="14" class="spin" />
+            {{ daxiaoLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="daxiaoLoading" @click="fillLatestDaxiao">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ daxiaoHint }}</p>
+        <p v-if="daxiaoError" class="bet-error">{{ daxiaoError }}</p>
+
+        <div v-if="daxiaoBoardLoading && !daxiao" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计大小…
+        </div>
+        <div v-else-if="daxiao" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ daxiao.sample_size }} 期 · 平均 {{ spanStat(daxiao.mean) }} · 中位 {{ spanStat(daxiao.median) }}
+            · 短窗 {{ spanStat(daxiao.short_avg) }} · 长窗 {{ spanStat(daxiao.long_avg) }} · 脉动 {{ spanSigned(daxiao.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(daxiao.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ daxiao.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="daxiao.drift || 'flat'">{{ daxiaoDriftLabel(daxiao.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(daxiao.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ daxiao.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="daxiao.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ daxiao.latest_draw.issue }} 期</span>
+                <span>{{ daxiaoRatio(daxiao.latest_draw.big_count, daxiao.latest_draw.small_count) }}</span>
+              </div>
+              <NumberBalls :numbers="daxiao.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!daxiao.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看主号大号个数的分布，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              大号个数
+              <span class="sub">{{ daxiaoCutoff(daxiao.boundary) }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in daxiaoBars" :key="bucket.big_count" class="span-bar" :class="{ 'is-current': daxiaoCurrent(bucket.big_count) }">
+                <span class="mono">{{ bucket.big_count }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, daxiao.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <div v-if="daxiao.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in daxiao.common" :key="'dx' + item.ratio" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="span-meta">{{ item.ratio }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="daxiao.special" class="span-pos">
+              <div class="card-title">{{ daxiao.special.label }} <span class="sub">有特别号就另算大号个数，不计入主号 · {{ daxiaoCutoff(daxiao.special.boundary) }}</span></div>
+              <p class="text-xs text-muted">
+                {{ daxiao.special.sample_size }} 期 · 短窗 {{ spanStat(daxiao.special.short_avg) }} · 长窗 {{ spanStat(daxiao.special.long_avg) }}
+                · {{ daxiaoDriftLabel(daxiao.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in daxiaoSpecialBars" :key="'dxs' + bucket.big_count" class="span-bar">
+                  <span class="mono">{{ bucket.big_count }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, daxiao.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="daxiaoScore" class="span-score">
+            <div class="card-title">这注的大小</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(daxiaoScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(daxiaoScore.ticket.alignment) }}</span>
+                  <span v-if="daxiaoScore.ticket.small_count != null">{{ daxiaoRatio(daxiaoScore.ticket.big_count, daxiaoScore.ticket.small_count) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ daxiaoScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanStat(daxiaoScore.ticket.big_count) }}</div>
+                <div class="text-xs text-muted">大号</div>
+              </div>
+            </div>
+            <div v-if="daxiaoSpecialScored" class="span-pos">
+              <div class="card-title">{{ daxiao.special?.label || '特别号' }} <span class="sub">这注的特别号大号个数，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ daxiaoScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanStat(daxiaoScore.special_ticket.big_count) }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(daxiaoScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -2690,7 +2843,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -2917,6 +3070,17 @@ const heweiError = ref('')
 const heweiLoading = ref(false)
 const heweiBoardLoading = ref(false)
 let heweiToken = 0
+const daxiaoLimit = ref(80)
+const daxiaoShort = ref(10)
+const daxiaoLong = ref(50)
+const daxiaoMain = ref('')
+const daxiaoSpecial = ref('')
+const daxiao = ref(null)
+const daxiaoScore = ref(null)
+const daxiaoError = ref('')
+const daxiaoLoading = ref(false)
+const daxiaoBoardLoading = ref(false)
+let daxiaoToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -3091,6 +3255,19 @@ const heweiHint = computed(() => (
 const heweiBars = computed(() => pulseVisibleBars(heweiPulse.value?.distribution, 'hewei'))
 const heweiSpecialBars = computed(() => pulseVisibleBars(heweiPulse.value?.special?.distribution, 'hewei'))
 const heweiSpecialScored = computed(() => heweiScore.value?.special_ticket?.hewei != null)
+const daxiaoHint = computed(() => {
+  const boundary = daxiao.value?.boundary
+  if (echoField.value.digit) {
+    return '整注各位数字里，0–4 为小、5–9 为大，重复数字保留。特别号不计入主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+  }
+  if (boundary) {
+    return `主号去重后，${boundary.lo}–${boundary.mid} 为小、${boundary.mid + 1}–${boundary.hi} 为大。特别号另算。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。`
+  }
+  return '主号按号码池中点分大小，大于中点为大。特别号另算。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+})
+const daxiaoBars = computed(() => pulseVisibleBars(daxiao.value?.distribution, 'big_count'))
+const daxiaoSpecialBars = computed(() => pulseVisibleBars(daxiao.value?.special?.distribution, 'big_count'))
+const daxiaoSpecialScored = computed(() => daxiaoScore.value?.special_ticket?.big_count != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -4453,6 +4630,96 @@ async function fillLatestHewei() {
   await runHewei()
 }
 
+function daxiaoWindows() {
+  let limit = Math.round(Number(daxiaoLimit.value))
+  let short = Math.round(Number(daxiaoShort.value))
+  let long = Math.round(Number(daxiaoLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  daxiaoLimit.value = limit
+  daxiaoShort.value = short
+  daxiaoLong.value = long
+  return { limit, short, long }
+}
+
+function daxiaoDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function daxiaoCutoff(boundary) {
+  if (!boundary) return ''
+  return `${boundary.lo}–${boundary.mid} 小，${boundary.mid + 1}–${boundary.hi} 大`
+}
+
+function daxiaoRatio(big, small) {
+  if (big == null || small == null) return ''
+  return `${big}大${small}小`
+}
+
+function daxiaoCurrent(value) {
+  return daxiaoScore.value?.ticket?.big_count === value
+}
+
+async function loadDaxiao() {
+  const token = ++daxiaoToken
+  daxiaoBoardLoading.value = true
+  const params = daxiaoWindows()
+  try {
+    const body = await getDaxiao(type.value, params)
+    if (token !== daxiaoToken) return
+    daxiao.value = body
+    daxiaoScore.value = null
+    daxiaoError.value = ''
+  } catch (e) {
+    if (token !== daxiaoToken) return
+    daxiao.value = null
+    daxiaoScore.value = null
+    daxiaoError.value = e.message || '大小加载失败'
+  } finally {
+    if (token === daxiaoToken) daxiaoBoardLoading.value = false
+  }
+}
+
+async function runDaxiao() {
+  daxiaoLoading.value = true
+  daxiaoError.value = ''
+  const params = daxiaoWindows()
+  try {
+    const main = splitNums(daxiaoMain.value)
+    const special = echoField.value.specialLabel ? splitNums(daxiaoSpecial.value) : []
+    const body = await postDaxiao(type.value, { main, special, ...params })
+    daxiao.value = body
+    daxiaoScore.value = body
+  } catch (e) {
+    daxiaoScore.value = null
+    daxiaoError.value = e.message || '打分失败'
+  } finally {
+    daxiaoLoading.value = false
+  }
+}
+
+async function fillLatestDaxiao() {
+  daxiaoError.value = ''
+  if (!daxiao.value) await loadDaxiao()
+  const latest = daxiao.value?.latest_draw
+  if (!latest) {
+    daxiaoScore.value = null
+    daxiaoError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  daxiaoMain.value = (latest.main || []).join(' ')
+  daxiaoSpecial.value = (latest.special || []).join(' ')
+  await runDaxiao()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -4716,6 +4983,14 @@ function load() {
   heweiLimit.value = 80
   heweiShort.value = 10
   heweiLong.value = 50
+  daxiao.value = null
+  daxiaoScore.value = null
+  daxiaoError.value = ''
+  daxiaoMain.value = ''
+  daxiaoSpecial.value = ''
+  daxiaoLimit.value = 80
+  daxiaoShort.value = 10
+  daxiaoLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -4732,6 +5007,7 @@ function load() {
   loadTail()
   loadAc()
   loadHewei()
+  loadDaxiao()
 }
 
 watch(periods, () => {

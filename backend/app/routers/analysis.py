@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas import AcIn, ClusterIn, CollisionIn, EchoIn, HeweiIn, MomentumIn, NeighborIn, ParityIn, PrimeIn, RepeatIn, RoadIn, SpanIn, SumIn, TailIn, ZoneIn
+from ..schemas import AcIn, ClusterIn, CollisionIn, DaxiaoIn, DaxiaoOut, DaxiaoScoreOut, EchoIn, HeweiIn, MomentumIn, NeighborIn, ParityIn, PrimeIn, RepeatIn, RoadIn, SpanIn, SumIn, TailIn, ZoneIn
 from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
 from ..services.collision import collide, collide_records
@@ -16,6 +16,7 @@ from ..services.parity import parity_summary, score_parity
 from ..services.prime import prime_summary, score_prime
 from ..services.ac import ac_summary, score_ac
 from ..services.hewei import hewei_summary, score_hewei
+from ..services.daxiao import daxiao_summary, score_daxiao
 from ..services.tail import score_tail, tail_summary
 from ..services.zone import score_zone, zone_summary
 from ..services.sum_pulse import score_sum, sum_summary
@@ -490,6 +491,44 @@ def post_hewei(lottery_type: str, body: HeweiIn, db: Session = Depends(get_db)):
     ensure_seed(db)
     try:
         return score_hewei(
+            db,
+            normalize_type(lottery_type),
+            body.main,
+            body.special,
+            limit=body.limit,
+            short=body.short,
+            long=body.long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/{lottery_type}/daxiao", response_model=DaxiaoOut)
+def get_daxiao(
+    lottery_type: str,
+    limit: int = Query(80, ge=5, le=200),
+    short: int = Query(10, ge=5, le=30),
+    long: int = Query(50, ge=20, le=200),
+    db: Session = Depends(get_db),
+):
+    ensure_seed(db)
+    try:
+        return daxiao_summary(
+            db,
+            normalize_type(lottery_type),
+            limit=limit,
+            short=short,
+            long=long,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/{lottery_type}/daxiao/score", response_model=DaxiaoScoreOut)
+def post_daxiao(lottery_type: str, body: DaxiaoIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    try:
+        return score_daxiao(
             db,
             normalize_type(lottery_type),
             body.main,
