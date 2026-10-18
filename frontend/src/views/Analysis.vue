@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾</p>
       </div>
     </div>
 
@@ -2370,6 +2370,158 @@
       </div>
     </div>
 
+    <div class="mb-4" id="hewei-pulse">
+      <div class="section-head">
+        <span>和尾脉动</span>
+        <span class="sub">短窗对比长窗 · 和值个位升降 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ heweiPulse?.disclaimer || '和尾脉动看主号和值个位的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="heweiLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="heweiShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="heweiLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="heweiMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="heweiSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="heweiBoardLoading" @click="loadHewei">
+            <AppIcon v-if="heweiBoardLoading" name="sync" :size="14" class="spin" />
+            {{ heweiBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="heweiLoading" @click="runHewei">
+            <AppIcon v-if="heweiLoading" name="sync" :size="14" class="spin" />
+            {{ heweiLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="heweiLoading" @click="fillLatestHewei">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ heweiHint }}</p>
+        <p v-if="heweiError" class="bet-error">{{ heweiError }}</p>
+
+        <div v-if="heweiBoardLoading && !heweiPulse" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计和尾…
+        </div>
+        <div v-else-if="heweiPulse" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ heweiPulse.sample_size }} 期 · 平均 {{ spanStat(heweiPulse.mean) }} · 中位 {{ spanStat(heweiPulse.median) }}
+            · 短窗 {{ spanStat(heweiPulse.short_avg) }} · 长窗 {{ spanStat(heweiPulse.long_avg) }} · 脉动 {{ spanSigned(heweiPulse.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(heweiPulse.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ heweiPulse.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="heweiPulse.drift || 'flat'">{{ heweiDriftLabel(heweiPulse.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(heweiPulse.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ heweiPulse.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="heweiPulse.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ heweiPulse.latest_draw.issue }} 期</span>
+                <span>和尾 {{ spanStat(heweiPulse.latest_draw.hewei) }}</span>
+              </div>
+              <NumberBalls :numbers="heweiPulse.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!heweiPulse.sample_size" class="empty">
+            <div class="empty-title">暂无开奖</div>
+            <div class="empty-desc">有开奖后，这里会看主号和值个位的分布，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              和尾分布
+              <span class="sub">{{ heweiPulse.basis === 'digits' ? '整注各位相加取个位，重复保留，0 和 9 不绕圈' : '主号去重后相加取个位' }}，0–9 十档，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in heweiBars" :key="bucket.hewei" class="span-bar" :class="{ 'is-current': heweiCurrent(bucket.hewei) }">
+                <span class="mono">{{ bucket.hewei }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, heweiPulse.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <div v-if="heweiPulse.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in heweiPulse.common" :key="'hw' + item.hewei" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="ball sm" :class="ballClass(type)">{{ item.hewei }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="heweiPulse.special" class="span-pos">
+              <div class="card-title">{{ heweiPulse.special.label }} <span class="sub">有特别号就另算和尾，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ heweiPulse.special.sample_size }} 期 · 短窗 {{ spanStat(heweiPulse.special.short_avg) }} · 长窗 {{ spanStat(heweiPulse.special.long_avg) }}
+                · {{ heweiDriftLabel(heweiPulse.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in heweiSpecialBars" :key="'hws' + bucket.hewei" class="span-bar">
+                  <span class="mono">{{ bucket.hewei }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, heweiPulse.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="heweiScore" class="span-score">
+            <div class="card-title">这注的和尾</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(heweiScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(heweiScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ heweiScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanStat(heweiScore.ticket.hewei) }}</div>
+                <div class="text-xs text-muted">和尾</div>
+              </div>
+            </div>
+            <div v-if="heweiSpecialScored" class="span-pos">
+              <div class="card-title">{{ heweiPulse.special?.label || '特别号' }} <span class="sub">这注的特别号和尾，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ heweiScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanStat(heweiScore.special_ticket.hewei) }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(heweiScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -2538,7 +2690,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -2754,6 +2906,17 @@ const acError = ref('')
 const acLoading = ref(false)
 const acBoardLoading = ref(false)
 let acToken = 0
+const heweiLimit = ref(80)
+const heweiShort = ref(10)
+const heweiLong = ref(50)
+const heweiMain = ref('')
+const heweiSpecial = ref('')
+const heweiPulse = ref(null)
+const heweiScore = ref(null)
+const heweiError = ref('')
+const heweiLoading = ref(false)
+const heweiBoardLoading = ref(false)
+let heweiToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -2920,6 +3083,14 @@ const acBarsCollapsed = computed(() => {
 })
 const acSpecialBars = computed(() => pulseVisibleBars(acPulse.value?.special?.distribution, 'ac_value'))
 const acSpecialScored = computed(() => acScore.value?.special_ticket?.ac_value != null)
+const heweiHint = computed(() => (
+  echoField.value.digit
+    ? '整注各位数字相加后取个位，重复数字保留，0 和 9 不绕圈。这不是原始和值，也不是不重复尾数的种类数。特别号不计入主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+    : '主号去重后相加，取和值的个位。这不是原始和值，也不是尾数种类。特别号不并进去，有特别号时另算。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+))
+const heweiBars = computed(() => pulseVisibleBars(heweiPulse.value?.distribution, 'hewei'))
+const heweiSpecialBars = computed(() => pulseVisibleBars(heweiPulse.value?.special?.distribution, 'hewei'))
+const heweiSpecialScored = computed(() => heweiScore.value?.special_ticket?.hewei != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -4202,6 +4373,86 @@ async function fillLatestAc() {
   await runAc()
 }
 
+function heweiWindows() {
+  let limit = Math.round(Number(heweiLimit.value))
+  let short = Math.round(Number(heweiShort.value))
+  let long = Math.round(Number(heweiLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  heweiLimit.value = limit
+  heweiShort.value = short
+  heweiLong.value = long
+  return { limit, short, long }
+}
+
+function heweiDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function heweiCurrent(value) {
+  return heweiScore.value?.ticket?.hewei === value
+}
+
+async function loadHewei() {
+  const token = ++heweiToken
+  heweiBoardLoading.value = true
+  const params = heweiWindows()
+  try {
+    const body = await getHewei(type.value, params)
+    if (token !== heweiToken) return
+    heweiPulse.value = body
+    heweiScore.value = null
+    heweiError.value = ''
+  } catch (e) {
+    if (token !== heweiToken) return
+    heweiPulse.value = null
+    heweiScore.value = null
+    heweiError.value = e.message || '和尾加载失败'
+  } finally {
+    if (token === heweiToken) heweiBoardLoading.value = false
+  }
+}
+
+async function runHewei() {
+  heweiLoading.value = true
+  heweiError.value = ''
+  const params = heweiWindows()
+  try {
+    const main = splitNums(heweiMain.value)
+    const special = echoField.value.specialLabel ? splitNums(heweiSpecial.value) : []
+    const body = await postHewei(type.value, { main, special, ...params })
+    heweiPulse.value = body
+    heweiScore.value = body
+  } catch (e) {
+    heweiScore.value = null
+    heweiError.value = e.message || '打分失败'
+  } finally {
+    heweiLoading.value = false
+  }
+}
+
+async function fillLatestHewei() {
+  heweiError.value = ''
+  if (!heweiPulse.value) await loadHewei()
+  const latest = heweiPulse.value?.latest_draw
+  if (!latest) {
+    heweiScore.value = null
+    heweiError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  heweiMain.value = (latest.main || []).join(' ')
+  heweiSpecial.value = (latest.special || []).join(' ')
+  await runHewei()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -4457,6 +4708,14 @@ function load() {
   acLimit.value = 80
   acShort.value = 10
   acLong.value = 50
+  heweiPulse.value = null
+  heweiScore.value = null
+  heweiError.value = ''
+  heweiMain.value = ''
+  heweiSpecial.value = ''
+  heweiLimit.value = 80
+  heweiShort.value = 10
+  heweiLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -4472,6 +4731,7 @@ function load() {
   loadZone()
   loadTail()
   loadAc()
+  loadHewei()
 }
 
 watch(periods, () => {

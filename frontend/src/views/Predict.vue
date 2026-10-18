@@ -169,7 +169,7 @@ const strategyHint = computed(() => ({
   cold: '更偏向近期出现少的号码',
   hybrid: '在热号基础上略保留冷号机会',
   random: '均匀随机，与历史无关',
-  pulse: '用重号、动量、邻号、跨度、连号簇、012路、和值、奇偶、质合、区位、尾数、AC值对照近期形态，分数不是中奖预测',
+  pulse: '用重号、动量、邻号、跨度、连号簇、012路、和值、奇偶、质合、区位、尾数、AC值、和尾对照近期形态，分数不是中奖预测',
 }[strategy.value]))
 
 function strategyName(value) {

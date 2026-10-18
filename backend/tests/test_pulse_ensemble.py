@@ -22,7 +22,7 @@ from app.services.pulse_ensemble import (
     score_ticket,
 )
 
-INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac"}
+INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac", "hewei"}
 
 
 def _draw(db, lottery_type, issue, main, special=None):
@@ -56,7 +56,7 @@ def _seed_dlt(db, count=10):
 
 def test_registry_uses_existing_ticket_scorers_and_skips_modules_without_one():
     keys = [item.key for item in PULSE_MODULES]
-    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac"]
+    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac", "hewei"]
     assert len(keys) == len(set(keys))
     skipped = {item["module"]: item["reason"] for item in SKIPPED_MODULES}
     assert {"collision", "echo", "affinity"} <= set(skipped)
@@ -361,6 +361,11 @@ def test_score_ticket_calls_registered_modules(db):
     assert ac["weight"] == 1.0
     assert ac["score"] is not None
     assert "AC值" in ac["note"]
+    hewei = next(item for item in scored["breakdown"] if item["module"] == "hewei")
+    assert hewei["label"] == "和尾"
+    assert hewei["weight"] == 1.0
+    assert hewei["score"] is not None
+    assert "和尾" in hewei["note"]
 
 
 def test_existing_strategies_do_not_gain_pulse_fields(db):
@@ -427,9 +432,11 @@ def test_openapi_documents_pulse_strategy(client):
     assert "zone" in weights
     assert "tail" in weights
     assert "ac" in weights
+    assert "hewei" in weights
     post = spec.json()["paths"]["/api/predict"]["post"]
     text = f"{post.get('summary', '')} {post.get('description', '')}"
     assert "pulse" in text or "脉动" in text
     assert "区位" in text
     assert "尾数" in text
     assert "AC值" in text
+    assert "和尾" in text

@@ -112,7 +112,7 @@ def test_ac_constants_distinguish_the_metric():
     assert "特别号" in SET_NOTE
     assert "0" in DIGIT_NOTE and "9" in DIGIT_NOTE
     keys = [item.key for item in PULSE_MODULES]
-    assert keys[-1] == "ac"
+    assert "ac" in keys
     assert [item.label for item in PULSE_MODULES if item.key == "ac"] == ["AC值"]
     assert ("app.services.ac", "ac_summary") in _MEMO_TARGETS
 
