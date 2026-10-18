@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小</p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a></p>
       </div>
     </div>
 
@@ -2675,6 +2675,159 @@
       </div>
     </div>
 
+    <div class="mb-4" id="shengping-pulse">
+      <div class="section-head">
+        <span>升平降脉动</span>
+        <span class="sub">短窗对比长窗 · 同位升降个数 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ shengping?.disclaimer || '升平降脉动看主号升的个数的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="shengpingLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="shengpingShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="shengpingLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="shengpingMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="shengpingSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="shengpingBoardLoading" @click="loadShengping">
+            <AppIcon v-if="shengpingBoardLoading" name="sync" :size="14" class="spin" />
+            {{ shengpingBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="shengpingLoading" @click="runShengping">
+            <AppIcon v-if="shengpingLoading" name="sync" :size="14" class="spin" />
+            {{ shengpingLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="shengpingLoading" @click="fillLatestShengping">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ shengpingHint }}</p>
+        <p v-if="shengpingError" class="bet-error">{{ shengpingError }}</p>
+
+        <div v-if="shengpingBoardLoading && !shengping" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计升平降…
+        </div>
+        <div v-else-if="shengping" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ shengping.sample_size }} 期 · 平均 {{ spanStat(shengping.mean) }} · 中位 {{ spanStat(shengping.median) }}
+            · 短窗 {{ spanStat(shengping.short_avg) }} · 长窗 {{ spanStat(shengping.long_avg) }} · 脉动 {{ spanSigned(shengping.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(shengping.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ shengping.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="shengping.drift || 'flat'">{{ shengpingDriftLabel(shengping.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(shengping.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ shengping.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="shengping.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ shengping.latest_draw.issue }} 期</span>
+                <span>{{ shengping.latest_draw.pattern || '暂无上期' }}</span>
+              </div>
+              <NumberBalls :numbers="shengping.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!shengping.sample_size" class="empty">
+            <div class="empty-title">暂无对照</div>
+            <div class="empty-desc">有相邻两期开奖后，这里会看主号升的个数，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              升的个数
+              <span class="sub">{{ shengping.basis === 'digits' ? '按位比较，保留重复，不排序' : '去重升序后按标准个数对齐' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in shengpingBars" :key="bucket.rise_count" class="span-bar" :class="{ 'is-current': shengpingCurrent(bucket.rise_count) }">
+                <span class="mono">{{ bucket.rise_count }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, shengping.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <div v-if="shengping.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in shengping.common" :key="'sp' + item.pattern" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="span-meta">{{ item.pattern }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="shengping.special" class="span-pos">
+              <div class="card-title">{{ shengping.special.label }} <span class="sub">有特别号就另算升平降，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ shengping.special.sample_size }} 期 · 短窗 {{ spanStat(shengping.special.short_avg) }} · 长窗 {{ spanStat(shengping.special.long_avg) }}
+                · {{ shengpingDriftLabel(shengping.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in shengpingSpecialBars" :key="'sps' + bucket.rise_count" class="span-bar">
+                  <span class="mono">{{ bucket.rise_count }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, shengping.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="shengpingScore" class="span-score">
+            <div class="card-title">这注的升平降</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(shengpingScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(shengpingScore.ticket.alignment) }}</span>
+                  <span v-if="shengpingScore.ticket.pattern">{{ shengpingScore.ticket.pattern }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ shengpingScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanStat(shengpingScore.ticket.rise_count) }}</div>
+                <div class="text-xs text-muted">升</div>
+              </div>
+            </div>
+            <div v-if="shengpingSpecialScored" class="span-pos">
+              <div class="card-title">{{ shengping.special?.label || '特别号' }} <span class="sub">这注的特别号升平降，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ shengpingScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanStat(shengpingScore.special_ticket.rise_count) }}</div>
+                  <div class="text-xs text-muted">{{ shengpingScore.special_ticket.pattern || spanRarityLabel(shengpingScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -2843,7 +2996,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao, getShengping, postShengping } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -3081,6 +3234,17 @@ const daxiaoError = ref('')
 const daxiaoLoading = ref(false)
 const daxiaoBoardLoading = ref(false)
 let daxiaoToken = 0
+const shengpingLimit = ref(80)
+const shengpingShort = ref(10)
+const shengpingLong = ref(50)
+const shengpingMain = ref('')
+const shengpingSpecial = ref('')
+const shengping = ref(null)
+const shengpingScore = ref(null)
+const shengpingError = ref('')
+const shengpingLoading = ref(false)
+const shengpingBoardLoading = ref(false)
+let shengpingToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -3268,6 +3432,14 @@ const daxiaoHint = computed(() => {
 const daxiaoBars = computed(() => pulseVisibleBars(daxiao.value?.distribution, 'big_count'))
 const daxiaoSpecialBars = computed(() => pulseVisibleBars(daxiao.value?.special?.distribution, 'big_count'))
 const daxiaoSpecialScored = computed(() => daxiaoScore.value?.special_ticket?.big_count != null)
+const shengpingHint = computed(() => (
+  echoField.value.digit
+    ? '按位比较相邻两期，保留重复和位置，不排序。当期位更大为升、相等为平、更小为降。特别号不计入主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+    : '主号去重后升序，按该彩种标准个数逐位比较。号码不足的期跳过。特别号另算，不并进主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+))
+const shengpingBars = computed(() => pulseVisibleBars(shengping.value?.distribution, 'rise_count'))
+const shengpingSpecialBars = computed(() => pulseVisibleBars(shengping.value?.special?.distribution, 'rise_count'))
+const shengpingSpecialScored = computed(() => shengpingScore.value?.special_ticket?.rise_count != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -4720,6 +4892,86 @@ async function fillLatestDaxiao() {
   await runDaxiao()
 }
 
+function shengpingWindows() {
+  let limit = Math.round(Number(shengpingLimit.value))
+  let short = Math.round(Number(shengpingShort.value))
+  let long = Math.round(Number(shengpingLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  shengpingLimit.value = limit
+  shengpingShort.value = short
+  shengpingLong.value = long
+  return { limit, short, long }
+}
+
+function shengpingDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function shengpingCurrent(value) {
+  return shengpingScore.value?.ticket?.rise_count === value
+}
+
+async function loadShengping() {
+  const token = ++shengpingToken
+  shengpingBoardLoading.value = true
+  const params = shengpingWindows()
+  try {
+    const body = await getShengping(type.value, params)
+    if (token !== shengpingToken) return
+    shengping.value = body
+    shengpingScore.value = null
+    shengpingError.value = ''
+  } catch (e) {
+    if (token !== shengpingToken) return
+    shengping.value = null
+    shengpingScore.value = null
+    shengpingError.value = e.message || '升平降加载失败'
+  } finally {
+    if (token === shengpingToken) shengpingBoardLoading.value = false
+  }
+}
+
+async function runShengping() {
+  shengpingLoading.value = true
+  shengpingError.value = ''
+  const params = shengpingWindows()
+  try {
+    const main = splitNums(shengpingMain.value)
+    const special = echoField.value.specialLabel ? splitNums(shengpingSpecial.value) : []
+    const body = await postShengping(type.value, { main, special, ...params })
+    shengping.value = body
+    shengpingScore.value = body
+  } catch (e) {
+    shengpingScore.value = null
+    shengpingError.value = e.message || '打分失败'
+  } finally {
+    shengpingLoading.value = false
+  }
+}
+
+async function fillLatestShengping() {
+  shengpingError.value = ''
+  if (!shengping.value) await loadShengping()
+  const latest = shengping.value?.latest_draw
+  if (!latest) {
+    shengpingScore.value = null
+    shengpingError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  shengpingMain.value = (latest.main || []).join(' ')
+  shengpingSpecial.value = (latest.special || []).join(' ')
+  await runShengping()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -4991,6 +5243,14 @@ function load() {
   daxiaoLimit.value = 80
   daxiaoShort.value = 10
   daxiaoLong.value = 50
+  shengping.value = null
+  shengpingScore.value = null
+  shengpingError.value = ''
+  shengpingMain.value = ''
+  shengpingSpecial.value = ''
+  shengpingLimit.value = 80
+  shengpingShort.value = 10
+  shengpingLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -5008,6 +5268,7 @@ function load() {
   loadAc()
   loadHewei()
   loadDaxiao()
+  loadShengping()
 }
 
 watch(periods, () => {
