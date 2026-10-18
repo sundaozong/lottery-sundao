@@ -1079,3 +1079,150 @@ button.ball {
 @media (max-width: 768px) {
   .span-windows { grid-template-columns: 1fr; }
 }
+
+.basket-add { margin-left: auto; flex: none; }
+@media (max-width: 768px) {
+  .basket-label { display: none; }
+}
+.basket-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.66rem;
+  line-height: 16px;
+  text-align: center;
+}
+.basket-nav {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+.nav-count {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 0.68rem;
+  display: inline-grid;
+  place-items: center;
+}
+.basket-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 28, 40, 0.4);
+  z-index: 200;
+}
+.basket-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100%);
+  background: var(--bg-base);
+  border-left: 1px solid var(--border);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-pop);
+}
+.basket-head,
+.basket-foot {
+  padding: 16px 18px;
+  background: var(--bg-card);
+}
+.basket-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.basket-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.basket-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px 8px;
+}
+.basket-foot {
+  border-top: 1px solid var(--border);
+}
+.basket-foot .form-group { margin-bottom: 8px; }
+.basket-summary {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.basket-collision {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.basket-hit-row,
+.basket-holes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.basket-hit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.basket-hit-count {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.basket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.basket-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+.basket-item-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.basket-item-top .text-xs { margin-right: auto; }
+.basket-manual {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.basket-manual .btn { margin-bottom: 10px; }
+.basket-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.basket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.basket-actions .btn-primary { margin-left: auto; }

@@ -11,6 +11,11 @@
         </router-link>
       </div>
       <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" type="button" @click="openBasket">
+          <AppIcon name="basket" />
+          <span class="basket-label">选号篮</span>
+          <span v-if="basketCount" class="basket-badge">{{ basketCount }}</span>
+        </button>
         <button class="btn btn-ghost btn-sm" type="button" :disabled="syncing" @click="onSync">
           <AppIcon name="sync" :class="{ spin: syncing }" />
           {{ syncing ? '同步中…' : '同步' }}
@@ -34,6 +39,10 @@
       <router-link class="nav-item" to="/analysis" @click="sidebarOpen = false"><AppIcon name="chart" /> 分析中心</router-link>
       <router-link class="nav-item" to="/predict" @click="sidebarOpen = false"><AppIcon name="sparkle" /> 预测 / 推荐</router-link>
       <div class="nav-label">账本</div>
+      <button class="nav-item basket-nav" type="button" @click="openBasket(); sidebarOpen = false">
+        <AppIcon name="basket" /> 选号篮
+        <span v-if="basketCount" class="nav-count">{{ basketCount }}</span>
+      </button>
       <router-link class="nav-item" to="/records" @click="sidebarOpen = false"><AppIcon name="list" /> 购买记录</router-link>
       <router-link class="nav-item" to="/prize" @click="sidebarOpen = false"><AppIcon name="trophy" /> 奖金计算</router-link>
       <div class="nav-label">系统</div>
@@ -53,6 +62,7 @@
       <router-link class="mobile-tab" to="/settings"><AppIcon name="settings" />更多</router-link>
     </nav>
 
+    <PickBasket />
     <AppFeedback />
   </div>
 </template>
@@ -62,8 +72,11 @@ import { ref, onMounted } from 'vue'
 import { api } from '../api'
 import AppIcon from './AppIcon.vue'
 import AppFeedback from './AppFeedback.vue'
+import PickBasket from './PickBasket.vue'
 import { toast } from '../composables/feedback'
+import { useBasket } from '../composables/useBasket'
 
+const { count: basketCount, show: openBasket } = useBasket()
 const sidebarOpen = ref(false)
 const syncing = ref(false)
 const dataTag = ref('本地')

@@ -68,6 +68,7 @@
             {{ echoLoading ? '对照中…' : '对照' }}
           </button>
           <button class="btn btn-ghost" type="button" :disabled="echoLoading" @click="fillLatestEcho">用最新开奖对照</button>
+          <button class="btn btn-ghost" type="button" @click="addEchoToBasket">加入选号篮</button>
         </div>
         <p class="form-hint">
           {{ echoField.digit ? '同一位置数字相同才算重合，顺序不能打乱。' : '看号码重合了几个，先后顺序不影响。' }}
@@ -3457,6 +3458,10 @@ import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
 import AppIcon from '../components/AppIcon.vue'
+import { toast } from '../composables/feedback'
+import { useBasket } from '../composables/useBasket'
+
+const basket = useBasket()
 
 const ECHO_FIELDS = {
   ssq: { main: '01 02 03 04 05 06', special: '16', specialLabel: '蓝球', digit: false },
@@ -4151,6 +4156,20 @@ async function runEcho() {
   } finally {
     echoLoading.value = false
   }
+}
+
+function addEchoToBasket() {
+  const field = echoField.value
+  const main = splitNums(echoMain.value)
+  const special = field.specialLabel && type.value !== 'qlc' ? splitNums(echoSpecial.value) : []
+  const outcome = basket.add({
+    lottery_type: type.value,
+    numbers: { main, special },
+    source: 'analysis',
+    note: '回声对照',
+  })
+  const kind = outcome.status === 'added' ? 'ok' : outcome.status === 'duplicate' ? 'info' : 'error'
+  toast(outcome.message, kind)
 }
 
 async function fillLatestEcho() {
@@ -6062,6 +6081,8 @@ watch(() => route.query.type, (next) => {
     load()
   }
 })
+
+watch(type, (value) => basket.setViewType(value), { immediate: true })
 
 onMounted(load)
 </script>
