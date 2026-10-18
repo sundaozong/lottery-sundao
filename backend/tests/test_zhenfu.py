@@ -131,8 +131,8 @@ def test_zhenfu_constants_and_equal_weight_registry():
         assert word in DIGIT_NOTE
         assert word in SET_NOTE
     keys = [item.key for item in PULSE_MODULES]
-    assert keys[-2] == "zhenfu"
-    assert keys[-3] == "shengping"
+    assert keys[-3] == "zhenfu"
+    assert keys[-4] == "shengping"
     assert [item.label for item in PULSE_MODULES if item.key == "zhenfu"] == ["振幅"]
     assert ("app.services.zhenfu", "zhenfu_summary") in _MEMO_TARGETS
     assert len(keys) == len(set(keys))
@@ -696,7 +696,7 @@ def test_ensemble_includes_zhenfu_at_equal_weight(db):
     _draw(db, "ssq", "2026001", ["01", "08", "18", "19", "20", "33"], ["09"])
     _draw(db, "ssq", "2026002", ["02", "09", "18", "19", "21", "32"], ["10"])
     scored = score_ticket(db, "ssq", ["03", "08", "14", "19", "25", "31"], ["09"])
-    assert [item["module"] for item in scored["breakdown"]][-2] == "zhenfu"
+    assert [item["module"] for item in scored["breakdown"]][-3] == "zhenfu"
     row = next(item for item in scored["breakdown"] if item["module"] == "zhenfu")
     assert row["label"] == "振幅"
     assert row["weight"] == 1.0
@@ -820,7 +820,7 @@ def test_zhenfu_endpoints_bounds_and_old_contracts(client, db):
     assert pulse.status_code == 200
     modules = pulse.json()["modules"]
     assert "zhenfu" in modules
-    assert modules[-2] == "zhenfu"
+    assert modules[-3] == "zhenfu"
     breakdown = pulse.json()["recommendations"][0]["breakdown"]
     assert any(item["module"] == "zhenfu" and item["weight"] == 1.0 for item in breakdown)
 

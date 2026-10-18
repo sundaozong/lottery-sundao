@@ -22,7 +22,7 @@ from app.services.pulse_ensemble import (
     score_ticket,
 )
 
-INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac", "hewei", "daxiao", "shengping", "zhenfu", "junzhi"}
+INCLUDED = {"repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac", "hewei", "daxiao", "shengping", "zhenfu", "junzhi", "zhongwei"}
 
 
 def _draw(db, lottery_type, issue, main, special=None):
@@ -56,7 +56,7 @@ def _seed_dlt(db, count=10):
 
 def test_registry_uses_existing_ticket_scorers_and_skips_modules_without_one():
     keys = [item.key for item in PULSE_MODULES]
-    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac", "hewei", "daxiao", "shengping", "zhenfu", "junzhi"]
+    assert keys == ["repeat", "momentum", "neighbor", "span", "cluster", "road", "sum", "parity", "prime", "zone", "tail", "ac", "hewei", "daxiao", "shengping", "zhenfu", "junzhi", "zhongwei"]
     assert len(keys) == len(set(keys))
     skipped = {item["module"]: item["reason"] for item in SKIPPED_MODULES}
     assert {"collision", "echo", "affinity"} <= set(skipped)
