@@ -155,6 +155,15 @@ export const api = {
     return request(`/api/analysis/${type}/shengping?${params}`)
   },
   shengpingScore: (type, body) => request(`/api/analysis/${type}/shengping/score`, { method: 'POST', body: JSON.stringify(body) }),
+  zhenfu: (type, { limit = 80, short = 10, long = 50 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      short: String(short),
+      long: String(long),
+    })
+    return request(`/api/analysis/${type}/zhenfu?${params}`)
+  },
+  zhenfuScore: (type, body) => request(`/api/analysis/${type}/zhenfu/score`, { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
@@ -282,6 +291,14 @@ export function getShengping(type, params) {
 
 export function postShengping(type, body) {
   return api.shengpingScore(type, body)
+}
+
+export function getZhenfu(type, params) {
+  return api.zhenfu(type, params)
+}
+
+export function postZhenfu(type, body) {
+  return api.zhenfuScore(type, body)
 }
 
 export async function downloadRecords() {

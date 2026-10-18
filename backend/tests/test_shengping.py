@@ -135,8 +135,7 @@ def test_shengping_constants_and_equal_weight_registry():
     assert "升" in DISCLAIMER
     assert "按位" in DIGIT_NOTE and "不排序" in DIGIT_NOTE
     keys = [item.key for item in PULSE_MODULES]
-    assert keys[-1] == "shengping"
-    assert keys[-2] == "daxiao"
+    assert keys[keys.index("daxiao") + 1] == "shengping"
     assert [item.label for item in PULSE_MODULES if item.key == "shengping"] == ["升平降"]
     assert ("app.services.shengping", "shengping_summary") in _MEMO_TARGETS
     assert len(keys) == len(set(keys))
@@ -678,7 +677,8 @@ def test_ensemble_includes_shengping_at_equal_weight(db):
     _draw(db, "ssq", "2026001", ["01", "08", "18", "19", "20", "33"], ["09"])
     _draw(db, "ssq", "2026002", ["02", "09", "18", "19", "21", "32"], ["10"])
     scored = score_ticket(db, "ssq", ["03", "08", "14", "19", "25", "31"], ["09"])
-    assert [item["module"] for item in scored["breakdown"]][-1] == "shengping"
+    modules = [item["module"] for item in scored["breakdown"]]
+    assert modules[modules.index("daxiao") + 1] == "shengping"
     row = next(item for item in scored["breakdown"] if item["module"] == "shengping")
     assert row["label"] == "升平降"
     assert row["weight"] == 1.0
@@ -802,7 +802,6 @@ def test_shengping_endpoints_bounds_and_old_contracts(client, db):
     assert pulse.status_code == 200
     modules = pulse.json()["modules"]
     assert "shengping" in modules
-    assert modules[-1] == "shengping"
     breakdown = pulse.json()["recommendations"][0]["breakdown"]
     assert any(item["module"] == "shengping" and item["weight"] == 1.0 for item in breakdown)
 

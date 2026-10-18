@@ -362,6 +362,91 @@ class ShengpingScoreOut(ShengpingOut):
     special_ticket: ShengpingTicket
 
 
+class ZhenfuIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    short: int = Field(default=10, ge=5, le=30)
+    long: int = Field(default=50, ge=20, le=200)
+
+
+class ZhenfuBucket(BaseModel):
+    amplitude_sum: int
+    count: int
+    rate: float
+
+
+class ZhenfuCommon(BaseModel):
+    amplitude_sum: int
+    count: int
+    rate: float
+
+
+class ZhenfuLatest(BaseModel):
+    issue: str
+    draw_date: str = ""
+    main: list[str]
+    special: list[str]
+    amplitude_sum: Optional[int] = None
+    special_amplitude_sum: Optional[int] = None
+
+
+class ZhenfuBlock(BaseModel):
+    label: str
+    sample_size: int
+    distribution: list[ZhenfuBucket]
+    common: list[ZhenfuCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+
+
+class ZhenfuTicket(BaseModel):
+    amplitude_sum: Optional[int] = None
+    percentile: Optional[float] = None
+    typicality: Optional[float] = None
+    rarity: Optional[str] = None
+    alignment: Optional[str] = None
+    note: str = ""
+
+
+class ZhenfuQuery(BaseModel):
+    main: list[str]
+    special: list[str]
+
+
+class ZhenfuOut(BaseModel):
+    lottery_type: str
+    mode: str
+    basis: str
+    sample_size: int
+    short: int
+    long: int
+    threshold: float
+    distribution: list[ZhenfuBucket]
+    common: list[ZhenfuCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+    note: str
+    latest_draw: Optional[ZhenfuLatest] = None
+    special: Optional[ZhenfuBlock] = None
+    data_status: str
+    disclaimer: str
+
+
+class ZhenfuScoreOut(ZhenfuOut):
+    query: ZhenfuQuery
+    ticket: ZhenfuTicket
+    special_ticket: ZhenfuTicket
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None
@@ -381,7 +466,7 @@ class PredictIn(BaseModel):
     count: int = Field(default=1, ge=1, le=10)
     weights: Optional[dict[str, float]] = Field(
         default=None,
-        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping。",
+        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping、zhenfu。",
     )
 
 

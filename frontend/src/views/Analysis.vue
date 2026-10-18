@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a></p>
+        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a> · <a href="#zhenfu-pulse">振幅</a></p>
       </div>
     </div>
 
@@ -2828,6 +2828,158 @@
       </div>
     </div>
 
+    <div class="mb-4" id="zhenfu-pulse">
+      <div class="section-head">
+        <span>振幅脉动</span>
+        <span class="sub">短窗对比长窗 · 同位绝对差之和 · 仅供娱乐，不构成投注建议</span>
+      </div>
+      <div class="card">
+        <div class="alert alert-disclaimer">
+          <AppIcon name="info" :size="14" style="margin-top:1px;flex:none" />
+          <div>{{ zhenfu?.disclaimer || '振幅脉动看主号相邻两期绝对差之和的历史分布，以及短窗相对长窗是走高还是走低，仅供娱乐，不构成投注建议。' }}</div>
+        </div>
+        <div class="form-row span-windows">
+          <div class="form-group">
+            <label class="form-label">样本（期）</label>
+            <input v-model.number="zhenfuLimit" class="form-input mono" type="number" min="5" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">短窗（期）</label>
+            <input v-model.number="zhenfuShort" class="form-input mono" type="number" min="5" max="30" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">长窗（期）</label>
+            <input v-model.number="zhenfuLong" class="form-input mono" type="number" min="20" max="200" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主号</label>
+            <input v-model="zhenfuMain" class="form-input mono" :placeholder="echoField.main" />
+          </div>
+          <div v-if="echoField.specialLabel" class="form-group">
+            <label class="form-label">{{ echoField.specialLabel }}</label>
+            <input v-model="zhenfuSpecial" class="form-input mono" :placeholder="echoField.special" />
+          </div>
+        </div>
+        <div class="predict-actions">
+          <button class="btn btn-ghost" type="button" :disabled="zhenfuBoardLoading" @click="loadZhenfu">
+            <AppIcon v-if="zhenfuBoardLoading" name="sync" :size="14" class="spin" />
+            {{ zhenfuBoardLoading ? '统计中…' : '刷新脉动' }}
+          </button>
+          <button class="btn btn-primary" type="button" :disabled="zhenfuLoading" @click="runZhenfu">
+            <AppIcon v-if="zhenfuLoading" name="sync" :size="14" class="spin" />
+            {{ zhenfuLoading ? '打分中…' : '给这注打分' }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="zhenfuLoading" @click="fillLatestZhenfu">用最新开奖</button>
+        </div>
+        <p class="form-hint">{{ zhenfuHint }}</p>
+        <p v-if="zhenfuError" class="bet-error">{{ zhenfuError }}</p>
+
+        <div v-if="zhenfuBoardLoading && !zhenfu" class="loading-line">
+          <AppIcon name="sync" :size="15" class="spin" />统计振幅…
+        </div>
+        <div v-else-if="zhenfu" class="span-list">
+          <p class="text-xs text-muted">
+            样本 {{ zhenfu.sample_size }} 期 · 平均 {{ spanStat(zhenfu.mean) }} · 中位 {{ spanStat(zhenfu.median) }}
+            · 短窗 {{ spanStat(zhenfu.short_avg) }} · 长窗 {{ spanStat(zhenfu.long_avg) }} · 脉动 {{ spanSigned(zhenfu.pulse) }}
+          </p>
+          <div class="span-meter">
+            <div>
+              <div class="span-meter-num">{{ spanStat(zhenfu.short_avg) }}</div>
+              <div class="text-xs text-muted">短窗 {{ zhenfu.short }} 期</div>
+            </div>
+            <div class="span-drift" :class="zhenfu.drift || 'flat'">{{ zhenfuDriftLabel(zhenfu.drift) }}</div>
+            <div>
+              <div class="span-meter-num">{{ spanStat(zhenfu.long_avg) }}</div>
+              <div class="text-xs text-muted">长窗 {{ zhenfu.long }} 期</div>
+            </div>
+          </div>
+          <div v-if="zhenfu.latest_draw" class="span-row">
+            <div class="echo-draw">
+              <div class="echo-meta">
+                <span>最新开奖</span>
+                <span class="mono">第 {{ zhenfu.latest_draw.issue }} 期</span>
+                <span>{{ zhenfu.latest_draw.amplitude_sum == null ? '暂无上期' : `振幅 ${zhenfu.latest_draw.amplitude_sum}` }}</span>
+              </div>
+              <NumberBalls :numbers="zhenfu.latest_draw" :type="type" size="sm" />
+            </div>
+          </div>
+          <div v-if="!zhenfu.sample_size" class="empty">
+            <div class="empty-title">暂无对照</div>
+            <div class="empty-desc">有相邻两期开奖后，这里会看主号振幅，以及短窗相对长窗是走高还是走低。仅供娱乐，不构成投注建议。</div>
+          </div>
+          <template v-else>
+            <div class="card-title">
+              振幅
+              <span class="sub">{{ zhenfu.basis === 'digits' ? '按位比较，保留重复，不排序' : '去重升序后按标准个数对齐' }}，特别号不计入</span>
+            </div>
+            <div class="span-bars">
+              <div v-for="bucket in zhenfuBars" :key="bucket.amplitude_sum" class="span-bar" :class="{ 'is-current': zhenfuCurrent(bucket.amplitude_sum) }">
+                <span class="mono">{{ bucket.amplitude_sum }}</span>
+                <span class="span-bar-track">
+                  <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, zhenfu.distribution) }" />
+                </span>
+                <span class="mono">{{ bucket.count }}</span>
+              </div>
+            </div>
+            <div v-if="zhenfu.common?.length" class="span-band">
+              <span class="span-tag">常见</span>
+              <div class="balls">
+                <span v-for="item in zhenfu.common" :key="'zf' + item.amplitude_sum" class="span-chip" :title="`出现 ${item.count} 次`">
+                  <span class="span-meta">{{ item.amplitude_sum }}</span>
+                  <span class="span-meta">{{ item.count }}</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="zhenfu.special" class="span-pos">
+              <div class="card-title">{{ zhenfu.special.label }} <span class="sub">有特别号就另算振幅，不计入主号</span></div>
+              <p class="text-xs text-muted">
+                {{ zhenfu.special.sample_size }} 期 · 短窗 {{ spanStat(zhenfu.special.short_avg) }} · 长窗 {{ spanStat(zhenfu.special.long_avg) }}
+                · {{ zhenfuDriftLabel(zhenfu.special.drift) }}
+              </p>
+              <div class="span-bars">
+                <div v-for="bucket in zhenfuSpecialBars" :key="'zfs' + bucket.amplitude_sum" class="span-bar">
+                  <span class="mono">{{ bucket.amplitude_sum }}</span>
+                  <span class="span-bar-track">
+                    <span class="span-bar-fill" :style="{ width: spanBarWidth(bucket.count, zhenfu.special.distribution) }" />
+                  </span>
+                  <span class="mono">{{ bucket.count }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="zhenfuScore" class="span-score">
+            <div class="card-title">这注的振幅</div>
+            <div class="span-row">
+              <div class="echo-draw">
+                <div class="echo-meta">
+                  <span>{{ spanRarityLabel(zhenfuScore.ticket.rarity) }}</span>
+                  <span>{{ spanAlignLabel(zhenfuScore.ticket.alignment) }}</span>
+                </div>
+                <p class="text-xs text-muted">{{ zhenfuScore.ticket.note }}</p>
+              </div>
+              <div class="echo-score">
+                <div class="echo-score-num">{{ spanStat(zhenfuScore.ticket.amplitude_sum) }}</div>
+                <div class="text-xs text-muted">振幅</div>
+              </div>
+            </div>
+            <div v-if="zhenfuSpecialScored" class="span-pos">
+              <div class="card-title">{{ zhenfu.special?.label || '特别号' }} <span class="sub">这注的特别号振幅，不计入主号</span></div>
+              <div class="span-row">
+                <p class="text-xs text-muted">{{ zhenfuScore.special_ticket.note }}</p>
+                <div class="echo-score">
+                  <div class="echo-score-num">{{ spanStat(zhenfuScore.special_ticket.amplitude_sum) }}</div>
+                  <div class="text-xs text-muted">{{ spanRarityLabel(zhenfuScore.special_ticket.rarity) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-line"><AppIcon name="sync" :size="15" class="spin" />分析中…</div>
     <template v-else-if="data">
       <div class="grid grid-2 mb-4">
@@ -2996,7 +3148,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao, getShengping, postShengping } from '../api'
+import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, postNeighbor, getSpan, postSpan, getCluster, postCluster, getRoad, postRoad, getSum, postSum, getParity, postParity, getPrime, postPrime, getZone, postZone, getTail, postTail, getAc, postAc, getHewei, postHewei, getDaxiao, postDaxiao, getShengping, postShengping, getZhenfu, postZhenfu } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -3245,6 +3397,17 @@ const shengpingError = ref('')
 const shengpingLoading = ref(false)
 const shengpingBoardLoading = ref(false)
 let shengpingToken = 0
+const zhenfuLimit = ref(80)
+const zhenfuShort = ref(10)
+const zhenfuLong = ref(50)
+const zhenfuMain = ref('')
+const zhenfuSpecial = ref('')
+const zhenfu = ref(null)
+const zhenfuScore = ref(null)
+const zhenfuError = ref('')
+const zhenfuLoading = ref(false)
+const zhenfuBoardLoading = ref(false)
+let zhenfuToken = 0
 const collisionMainHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'main' && item.collision))
 const collisionSpecialHits = computed(() => (collisionResult.value?.number_hits || []).filter((item) => item.kind === 'special' && item.collision))
 const affinityDigit = computed(() => echoField.value.digit)
@@ -3440,6 +3603,14 @@ const shengpingHint = computed(() => (
 const shengpingBars = computed(() => pulseVisibleBars(shengping.value?.distribution, 'rise_count'))
 const shengpingSpecialBars = computed(() => pulseVisibleBars(shengping.value?.special?.distribution, 'rise_count'))
 const shengpingSpecialScored = computed(() => shengpingScore.value?.special_ticket?.rise_count != null)
+const zhenfuHint = computed(() => (
+  echoField.value.digit
+    ? '按位比较相邻两期，保留重复和位置，不排序。振幅是各位绝对差之和，0 与 9 不绕圈。特别号不计入主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+    : '主号去重后升序，按该彩种标准个数逐位比较绝对差。号码不足的期跳过。特别号另算，不并进主号。短窗平均比长窗高出 0.5 算走高。仅供娱乐，不构成投注建议。'
+))
+const zhenfuBars = computed(() => pulseVisibleBars(zhenfu.value?.distribution, 'amplitude_sum'))
+const zhenfuSpecialBars = computed(() => pulseVisibleBars(zhenfu.value?.special?.distribution, 'amplitude_sum'))
+const zhenfuSpecialScored = computed(() => zhenfuScore.value?.special_ticket?.amplitude_sum != null)
 const neighborHint = computed(() => (
   echoField.value.digit
     ? '按位置看。某个数字开出后，随后几期同一位置会不会开出旁边的数字。0 和 9 不绕圈，特别号单独看。仅供娱乐，不构成投注建议。'
@@ -4972,6 +5143,86 @@ async function fillLatestShengping() {
   await runShengping()
 }
 
+function zhenfuWindows() {
+  let limit = Math.round(Number(zhenfuLimit.value))
+  let short = Math.round(Number(zhenfuShort.value))
+  let long = Math.round(Number(zhenfuLong.value))
+  if (!Number.isFinite(limit)) limit = 80
+  if (!Number.isFinite(short)) short = 10
+  if (!Number.isFinite(long)) long = 50
+  limit = Math.min(200, Math.max(5, limit))
+  short = Math.min(30, Math.max(5, short))
+  long = Math.min(200, Math.max(20, long))
+  if (long <= short) long = Math.min(200, short + 1)
+  zhenfuLimit.value = limit
+  zhenfuShort.value = short
+  zhenfuLong.value = long
+  return { limit, short, long }
+}
+
+function zhenfuDriftLabel(drift) {
+  if (drift === 'rising') return '走高'
+  if (drift === 'falling') return '走低'
+  if (drift === 'flat') return '持平'
+  return '暂无'
+}
+
+function zhenfuCurrent(value) {
+  return zhenfuScore.value?.ticket?.amplitude_sum === value
+}
+
+async function loadZhenfu() {
+  const token = ++zhenfuToken
+  zhenfuBoardLoading.value = true
+  const params = zhenfuWindows()
+  try {
+    const body = await getZhenfu(type.value, params)
+    if (token !== zhenfuToken) return
+    zhenfu.value = body
+    zhenfuScore.value = null
+    zhenfuError.value = ''
+  } catch (e) {
+    if (token !== zhenfuToken) return
+    zhenfu.value = null
+    zhenfuScore.value = null
+    zhenfuError.value = e.message || '振幅加载失败'
+  } finally {
+    if (token === zhenfuToken) zhenfuBoardLoading.value = false
+  }
+}
+
+async function runZhenfu() {
+  zhenfuLoading.value = true
+  zhenfuError.value = ''
+  const params = zhenfuWindows()
+  try {
+    const main = splitNums(zhenfuMain.value)
+    const special = echoField.value.specialLabel ? splitNums(zhenfuSpecial.value) : []
+    const body = await postZhenfu(type.value, { main, special, ...params })
+    zhenfu.value = body
+    zhenfuScore.value = body
+  } catch (e) {
+    zhenfuScore.value = null
+    zhenfuError.value = e.message || '打分失败'
+  } finally {
+    zhenfuLoading.value = false
+  }
+}
+
+async function fillLatestZhenfu() {
+  zhenfuError.value = ''
+  if (!zhenfu.value) await loadZhenfu()
+  const latest = zhenfu.value?.latest_draw
+  if (!latest) {
+    zhenfuScore.value = null
+    zhenfuError.value = '暂无开奖可对照。仅供娱乐，不构成投注建议。'
+    return
+  }
+  zhenfuMain.value = (latest.main || []).join(' ')
+  zhenfuSpecial.value = (latest.special || []).join(' ')
+  await runZhenfu()
+}
+
 async function fillLatestZone() {
   zoneError.value = ''
   if (!zone.value) await loadZone()
@@ -5251,6 +5502,14 @@ function load() {
   shengpingLimit.value = 80
   shengpingShort.value = 10
   shengpingLong.value = 50
+  zhenfu.value = null
+  zhenfuScore.value = null
+  zhenfuError.value = ''
+  zhenfuMain.value = ''
+  zhenfuSpecial.value = ''
+  zhenfuLimit.value = 80
+  zhenfuShort.value = 10
+  zhenfuLong.value = 50
   loadDraws()
   loadAnalysis()
   loadAffinity()
@@ -5269,6 +5528,7 @@ function load() {
   loadHewei()
   loadDaxiao()
   loadShengping()
+  loadZhenfu()
 }
 
 watch(periods, () => {
