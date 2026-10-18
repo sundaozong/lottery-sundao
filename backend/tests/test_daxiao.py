@@ -120,7 +120,7 @@ def test_daxiao_constants_and_equal_weight_registry():
     assert "大号" in DISCLAIMER
     assert "0–4" in DIGIT_NOTE and "5–9" in DIGIT_NOTE
     keys = [item.key for item in PULSE_MODULES]
-    assert keys[-1] == "daxiao"
+    assert "daxiao" in keys
     assert [item.label for item in PULSE_MODULES if item.key == "daxiao"] == ["大小"]
     assert ("app.services.daxiao", "daxiao_summary") in _MEMO_TARGETS
     assert len(keys) == len(set(keys))
@@ -644,7 +644,7 @@ def test_empty_history_parameter_clamp_and_common_cap(db):
 def test_ensemble_includes_daxiao_at_equal_weight(db):
     _draw(db, "ssq", "2026001", ["01", "08", "18", "19", "20", "33"], ["09"])
     scored = score_ticket(db, "ssq", ["03", "08", "14", "19", "25", "31"], ["09"])
-    assert [item["module"] for item in scored["breakdown"]][-1] == "daxiao"
+    assert any(item["module"] == "daxiao" for item in scored["breakdown"])
     row = next(item for item in scored["breakdown"] if item["module"] == "daxiao")
     assert row["label"] == "大小"
     assert row["weight"] == 1.0
@@ -798,7 +798,7 @@ def test_daxiao_endpoints_bounds_and_old_contracts(client, db):
     assert pulse.status_code == 200
     modules = pulse.json()["modules"]
     assert "daxiao" in modules
-    assert modules[-1] == "daxiao"
+    assert "daxiao" in modules
     breakdown = pulse.json()["recommendations"][0]["breakdown"]
     assert any(item["module"] == "daxiao" and item["weight"] == 1.0 for item in breakdown)
 

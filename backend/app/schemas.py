@@ -265,6 +265,103 @@ class DaxiaoScoreOut(DaxiaoOut):
     special_ticket: DaxiaoTicket
 
 
+class ShengpingIn(BaseModel):
+    main: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+    short: int = Field(default=10, ge=5, le=30)
+    long: int = Field(default=50, ge=20, le=200)
+
+
+class ShengpingBucket(BaseModel):
+    rise_count: int
+    count: int
+    rate: float
+
+
+class ShengpingCommon(BaseModel):
+    rise_count: int
+    flat_count: int
+    fall_count: int
+    pattern: str
+    count: int
+    rate: float
+
+
+class ShengpingLatest(BaseModel):
+    issue: str
+    draw_date: str = ""
+    main: list[str]
+    special: list[str]
+    rise_count: Optional[int] = None
+    flat_count: Optional[int] = None
+    fall_count: Optional[int] = None
+    pattern: Optional[str] = None
+    special_rise_count: Optional[int] = None
+    special_flat_count: Optional[int] = None
+    special_fall_count: Optional[int] = None
+    special_pattern: Optional[str] = None
+
+
+class ShengpingBlock(BaseModel):
+    label: str
+    sample_size: int
+    distribution: list[ShengpingBucket]
+    common: list[ShengpingCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+
+
+class ShengpingTicket(BaseModel):
+    rise_count: Optional[int] = None
+    flat_count: Optional[int] = None
+    fall_count: Optional[int] = None
+    pattern: Optional[str] = None
+    percentile: Optional[float] = None
+    typicality: Optional[float] = None
+    rarity: Optional[str] = None
+    alignment: Optional[str] = None
+    note: str = ""
+
+
+class ShengpingQuery(BaseModel):
+    main: list[str]
+    special: list[str]
+
+
+class ShengpingOut(BaseModel):
+    lottery_type: str
+    mode: str
+    basis: str
+    sample_size: int
+    short: int
+    long: int
+    threshold: float
+    distribution: list[ShengpingBucket]
+    common: list[ShengpingCommon]
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    short_avg: Optional[float] = None
+    long_avg: Optional[float] = None
+    pulse: Optional[float] = None
+    drift: Optional[str] = None
+    note: str
+    latest_draw: Optional[ShengpingLatest] = None
+    special: Optional[ShengpingBlock] = None
+    data_status: str
+    disclaimer: str
+
+
+class ShengpingScoreOut(ShengpingOut):
+    query: ShengpingQuery
+    ticket: ShengpingTicket
+    special_ticket: ShengpingTicket
+
+
 class CollisionTicket(BaseModel):
     main: Any = None
     special: Any = None
@@ -284,7 +381,7 @@ class PredictIn(BaseModel):
     count: int = Field(default=1, ge=1, le=10)
     weights: Optional[dict[str, float]] = Field(
         default=None,
-        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao。",
+        description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping。",
     )
 
 

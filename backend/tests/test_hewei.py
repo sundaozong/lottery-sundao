@@ -111,8 +111,7 @@ def test_hewei_constants_distinguish_the_metric():
     assert "尾数" in SET_NOTE
     assert "0" in DIGIT_NOTE and "9" in DIGIT_NOTE
     keys = [item.key for item in PULSE_MODULES]
-    assert keys[-2] == "hewei"
-    assert keys[-1] == "daxiao"
+    assert keys[keys.index("hewei") + 1] == "daxiao"
     assert [item.label for item in PULSE_MODULES if item.key == "hewei"] == ["和尾"]
     assert ("app.services.hewei", "hewei_summary") in _MEMO_TARGETS
 
