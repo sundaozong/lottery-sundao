@@ -220,8 +220,8 @@
 
         <div v-if="result" class="card mb-4">
           <div class="card-title">
-            推荐方案
-            <span class="sub">{{ TYPE_NAMES[result.lottery_type] || result.lottery_type }} · {{ strategyName(result.strategy) }}</span>
+            <span>推荐方案 <span class="sub">{{ TYPE_NAMES[result.lottery_type] || result.lottery_type }} · {{ strategyName(result.strategy) }}</span></span>
+            <button class="btn btn-ghost btn-sm" type="button" @click="addAll">全部加入</button>
           </div>
           <div class="predict-rows">
             <div
@@ -235,6 +235,7 @@
                   <span class="predict-row-label">方案 {{ i + 1 }}</span>
                   <NumberBalls :numbers="rec" :type="result.lottery_type" />
                   <span class="pulse-score" :title="'综合 ' + formatScore(rec.score)">{{ formatScore(rec.score) }}</span>
+                  <button class="btn btn-ghost btn-sm basket-add" type="button" @click="addRec(rec)">加入选号篮</button>
                 </div>
                 <p class="pulse-rationale">{{ rec.rationale }}</p>
                 <div class="pulse-chips">
@@ -258,6 +259,7 @@
                 <div class="predict-row-main">
                   <span class="predict-row-label">方案 {{ i + 1 }}</span>
                   <NumberBalls :numbers="rec" :type="result.lottery_type" />
+                  <button class="btn btn-ghost btn-sm basket-add" type="button" @click="addRec(rec)">加入选号篮</button>
                 </div>
                 <p v-if="rec.constraint_summary" class="constraint-summary">{{ rec.constraint_summary }}</p>
               </template>
@@ -306,6 +308,9 @@ import { api, TYPE_NAMES } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { toast } from '../composables/feedback'
+import { useBasket } from '../composables/useBasket'
+
+const basket = useBasket()
 
 const LOTTERY_META = {
   ssq: { digit: false, need: 6, special: true, mainLo: 1, mainHi: 33, specLo: 1, specHi: 16, width: 2 },
@@ -561,6 +566,37 @@ async function run() {
   }
 }
 
+function addRec(rec) {
+  if (!result.value) return
+  const outcome = basket.add({
+    lottery_type: result.value.lottery_type,
+    numbers: { main: rec.main, special: rec.special },
+    source: 'predict',
+    strategy: result.value.strategy,
+  })
+  const kind = outcome.status === 'added' ? 'ok' : outcome.status === 'duplicate' ? 'info' : 'error'
+  toast(outcome.message, kind)
+}
+
+function addAll() {
+  if (!result.value?.recommendations?.length) return
+  const summary = basket.addMany(result.value.recommendations.map((rec) => ({
+    lottery_type: result.value.lottery_type,
+    numbers: { main: rec.main, special: rec.special },
+    source: 'predict',
+    strategy: result.value.strategy,
+  })))
+  if (!summary.added && summary.duplicates && !summary.invalid.length) {
+    toast('这些号码已在选号篮里', 'info')
+    return
+  }
+  const parts = []
+  if (summary.added) parts.push(`加入 ${summary.added} 注`)
+  if (summary.duplicates) parts.push(`${summary.duplicates} 注已在篮里`)
+  if (summary.invalid.length) parts.push(`${summary.invalid.length} 注无法加入`)
+  toast(parts.join('，') || '没有可加入的号码', summary.added ? 'ok' : 'info')
+}
+
 async function sendMail() {
   if (!result.value) return
   mailing.value = true
@@ -580,6 +616,7 @@ async function sendMail() {
 }
 
 watch(lotteryType, () => {
+  basket.setViewType(lotteryType.value)
   result.value = null
   mailMsg.value = ''
   storageReady.value = false
@@ -597,6 +634,7 @@ watch(strategy, () => {
 })
 
 onMounted(() => {
+  basket.setViewType(lotteryType.value)
   constraints.value = loadConstraints(lotteryType.value)
   storageReady.value = true
   loadRecent()

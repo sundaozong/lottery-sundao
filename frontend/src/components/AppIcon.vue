@@ -49,6 +49,7 @@ const ICONS = {
   menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   download: '<path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 19h14"/>',
+  basket: '<path d="M6 8h12l-1.2 12H7.2z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
 }
 
 const path = computed(() => ICONS[props.name] || '')
