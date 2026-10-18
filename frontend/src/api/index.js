@@ -182,7 +182,16 @@ export const api = {
     return request(`/api/analysis/${type}/zhongwei?${params}`)
   },
   zhongweiScore: (type, body) => request(`/api/analysis/${type}/zhongwei/score`, { method: 'POST', body: JSON.stringify(body) }),
-  predict: (body) => request('/api/predict', { method: 'POST', body: JSON.stringify(body) }),
+  predict: (body) => {
+    const payload = {
+      lottery_type: body.lottery_type,
+      strategy: body.strategy,
+      count: body.count,
+    }
+    if (body.weights) payload.weights = body.weights
+    if (body.constraints && Object.keys(body.constraints).length) payload.constraints = body.constraints
+    return request('/api/predict', { method: 'POST', body: JSON.stringify(payload) })
+  },
   records: () => request('/api/records'),
   recordMonths: () => request('/api/records/monthly'),
   rhythm: () => request('/api/records/rhythm'),

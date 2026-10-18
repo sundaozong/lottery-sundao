@@ -627,6 +627,32 @@ class CollisionIn(BaseModel):
     from_records: bool = False
 
 
+class PredictConstraints(BaseModel):
+    """机选硬条件，字段都可省略。省略或空对象时与原来的按策略抽样一致。
+
+    乐透（双色球、大乐透、七乐彩、快乐八）按号码集合：胆码和杀号去重，奇偶、和值、跨度、大小、区位、连号都看去重后的主号。
+    数字彩（福彩3D、排列三、排列五、七星彩）保留位置和重复：奇偶、和值、跨度、大小、区位按各位计，0 为偶，0–4 为小、5–9 为大。
+    连号上限只约束乐透主号里的连续号码段，数字彩传入会拒绝。
+    """
+
+    include_main: Optional[list[str]] = Field(default=None, description="主号胆码，必须全部出现。乐透按集合，数字彩至少出现一次。")
+    exclude_main: Optional[list[str]] = Field(default=None, description="主号杀号，不得出现。")
+    include_special: Optional[list[str]] = Field(default=None, description="特别号胆码，必须全部出现。")
+    exclude_special: Optional[list[str]] = Field(default=None, description="特别号杀号，不得出现。")
+    odd_count: Optional[int] = Field(default=None, description="主号奇数个数，精确值。数字彩按位计并保留重复，0 为偶数。")
+    odd_min: Optional[int] = Field(default=None, description="主号奇数个数下限。")
+    odd_max: Optional[int] = Field(default=None, description="主号奇数个数上限。")
+    sum_min: Optional[int] = Field(default=None, description="主号和值下限。")
+    sum_max: Optional[int] = Field(default=None, description="主号和值上限。")
+    span_min: Optional[int] = Field(default=None, description="主号跨度下限，跨度为最大号减最小号。")
+    span_max: Optional[int] = Field(default=None, description="主号跨度上限。")
+    max_consecutive: Optional[int] = Field(default=None, description="主号连续号码段的最大长度，仅乐透。")
+    zone_counts: Optional[list[int]] = Field(default=None, description="三区个数，长度 3，分区与区位脉动相同。")
+    big_count: Optional[int] = Field(default=None, description="大号个数精确值。分界与大小脉动相同：小于等于中点为小，大于中点为大。")
+    big_min: Optional[int] = Field(default=None, description="大号个数下限。")
+    big_max: Optional[int] = Field(default=None, description="大号个数上限。")
+
+
 class PredictIn(BaseModel):
     lottery_type: str
     strategy: str = Field(
@@ -637,6 +663,10 @@ class PredictIn(BaseModel):
     weights: Optional[dict[str, float]] = Field(
         default=None,
         description="仅 strategy=pulse 时生效。模块权重，缺省等权。可用键：repeat、momentum、neighbor、span、cluster、road、sum、parity、prime、zone、tail、ac、hewei、daxiao、shengping、zhenfu、junzhi、zhongwei。",
+    )
+    constraints: Optional[PredictConstraints] = Field(
+        default=None,
+        description="机选硬条件。只在 hot、cold、hybrid、random 上生效；不传或字段全空时与原来的抽样一致。脉动综合不套用。",
     )
 
 
