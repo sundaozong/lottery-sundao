@@ -141,6 +141,78 @@
           </div>
         </div>
 
+        <section class="basket-snapshots" aria-label="方案快照">
+          <button class="btn btn-ghost btn-sm" type="button" @click="showSnapshots = !showSnapshots">
+            {{ showSnapshots ? '收起方案快照' : '方案快照' }}<template v-if="snapshotList.length"> {{ snapshotList.length }}</template>
+          </button>
+          <template v-if="showSnapshots">
+            <p class="form-hint">把当前{{ typeName }}的注存成命名快照。清空篮不会丢掉。套用会替换本彩种，其他彩种不动。{{ snapshotDisclaimer }}</p>
+            <div class="basket-snapshot-save">
+              <label class="sr-only" for="basket-snapshot-name">快照名称</label>
+              <input
+                id="basket-snapshot-name"
+                v-model="snapshotName"
+                class="form-input"
+                maxlength="24"
+                placeholder="快照名称，如周末"
+                @keydown.enter.prevent="saveCurrentSnapshot(false)"
+              />
+              <button class="btn btn-primary btn-sm" type="button" @click="saveCurrentSnapshot(false)">保存</button>
+            </div>
+            <div v-if="snapshotConflict" class="basket-snapshot-conflict">
+              <span class="form-hint">{{ snapshotMsg }}</span>
+              <button class="btn btn-ghost btn-sm" type="button" @click="saveCurrentSnapshot(true)">覆盖</button>
+              <button class="btn btn-ghost btn-sm" type="button" @click="snapshotConflict = false">改名</button>
+            </div>
+            <p v-else-if="snapshotMsg" class="form-hint">{{ snapshotMsg }}</p>
+            <p v-if="!snapshotList.length" class="form-hint">这个彩种还没有快照。</p>
+            <div v-else class="basket-snapshot-list">
+              <div v-for="snap in snapshotList" :key="snap.id" class="basket-snapshot-row">
+                <div class="basket-snapshot-top">
+                  <span class="basket-snapshot-name">{{ snap.name }}</span>
+                  <span class="basket-snapshot-meta">{{ snap.items.length }} 注 · {{ timeLabel(snap.saved_at) }}</span>
+                </div>
+                <p v-if="snap.note" class="form-hint">{{ snap.note }}</p>
+                <div v-if="renamingId === snap.id" class="basket-snapshot-rename">
+                  <label class="sr-only" :for="`basket-snapshot-rename-${snap.id}`">新的快照名称</label>
+                  <input
+                    :id="`basket-snapshot-rename-${snap.id}`"
+                    v-model="renameText"
+                    class="form-input"
+                    maxlength="24"
+                    @keydown.enter.prevent="confirmRename(snap)"
+                  />
+                  <button class="btn btn-primary btn-sm" type="button" @click="confirmRename(snap)">确定</button>
+                  <button class="btn btn-ghost btn-sm" type="button" @click="renamingId = ''">取消</button>
+                </div>
+                <div v-else class="basket-snapshot-ops">
+                  <button class="btn btn-primary btn-sm" type="button" @click="applyOne(snap)">套用</button>
+                  <button class="btn btn-ghost btn-sm" type="button" @click="startRename(snap)">改名</button>
+                  <button class="btn btn-ghost btn-sm" type="button" @click="removeSnapshot(snap)">删除</button>
+                </div>
+              </div>
+            </div>
+            <div class="basket-snapshot-ops">
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="!snapshotList.length" @click="exportSnapshots">导出 JSON</button>
+              <button class="btn btn-ghost btn-sm" type="button" @click="snapshotImportOpen = !snapshotImportOpen">
+                {{ snapshotImportOpen ? '收起导入' : '导入' }}
+              </button>
+            </div>
+            <div v-if="snapshotImportOpen" class="basket-snapshot-import">
+              <label class="form-label" for="basket-snapshot-import">合并导入到当前彩种</label>
+              <textarea
+                id="basket-snapshot-import"
+                v-model="snapshotImportText"
+                class="form-textarea"
+                rows="4"
+                placeholder="粘贴方案快照 JSON"
+                spellcheck="false"
+              />
+              <button class="btn btn-ghost btn-sm" type="button" @click="importSnapshots">合并导入</button>
+            </div>
+          </template>
+        </section>
+
         <div class="basket-filter">
           <button class="btn btn-ghost btn-sm" type="button" @click="showFilter = !showFilter">
             {{ showFilter ? '收起条件过滤' : '条件过滤' }}
@@ -397,6 +469,15 @@ import { useRouter } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
 import {
+  SNAPSHOT_DISCLAIMER,
+  deleteSnapshot,
+  exportSnapshotsText,
+  importSnapshotsText,
+  listSnapshots,
+  renameSnapshot,
+  saveSnapshot,
+} from '../lib/basketSnapshots'
+import {
   CONSTRAINTS_UPDATED_EVENT,
   basketCoverage,
   coverageTicketIds,
@@ -443,6 +524,7 @@ const {
   clearCurrent,
   clearAll,
   dropIds,
+  installSnapshot,
 } = useBasket()
 const replay = useReplay()
 
@@ -456,6 +538,16 @@ const showManual = ref(false)
 const showPaste = ref(false)
 const pasteText = ref('')
 const showFilter = ref(false)
+const showSnapshots = ref(false)
+const snapshotList = ref([])
+const snapshotName = ref('')
+const snapshotMsg = ref('')
+const snapshotConflict = ref(false)
+const snapshotImportOpen = ref(false)
+const snapshotImportText = ref('')
+const renamingId = ref('')
+const renameText = ref('')
+const snapshotDisclaimer = SNAPSHOT_DISCLAIMER
 const filterForm = ref(emptyBasketFilter())
 const fillingBands = ref(false)
 const filterFields = [
@@ -532,6 +624,106 @@ const manualHint = computed(() => {
   if (profile.value?.mode === 'digit') return '每个位置点一个数字。顺序就是号码。'
   return '点满一注再放入。和篮里已有的号码相同会被拦住。'
 })
+
+function reloadSnapshots() {
+  snapshotList.value = listSnapshots(localStorage, viewType.value)
+}
+
+function saveCurrentSnapshot(overwrite) {
+  const result = saveSnapshot(localStorage, {
+    lotteryType: viewType.value,
+    name: snapshotName.value,
+    items: visible.value,
+  }, { overwrite })
+  if (!result.ok && result.status === 'conflict') {
+    snapshotConflict.value = true
+    snapshotMsg.value = result.message
+    return
+  }
+  snapshotConflict.value = false
+  snapshotMsg.value = result.ok
+    ? `${overwrite ? '已覆盖' : '已保存'}快照「${result.snapshot.name}」`
+    : result.message
+  if (!result.ok) {
+    toast(result.message, result.status === 'empty' ? 'info' : 'error')
+    return
+  }
+  snapshotName.value = ''
+  reloadSnapshots()
+  toast(snapshotMsg.value, 'ok')
+}
+
+function startRename(snap) {
+  renamingId.value = snap.id
+  renameText.value = snap.name
+  snapshotConflict.value = false
+  snapshotMsg.value = ''
+}
+
+function confirmRename(snap) {
+  const result = renameSnapshot(localStorage, viewType.value, snap.id, renameText.value)
+  snapshotMsg.value = result.ok ? `已改名为「${result.snapshot.name}」` : result.message
+  if (!result.ok) {
+    toast(result.message, result.status === 'name' ? 'info' : 'error')
+    return
+  }
+  renamingId.value = ''
+  reloadSnapshots()
+  toast(snapshotMsg.value, 'ok')
+}
+
+async function removeSnapshot(snap) {
+  const ok = await confirmDialog({
+    title: '删除快照',
+    message: `删除「${snap.name}」？选号篮里的注还留着。`,
+    confirmText: '删除',
+  })
+  if (!ok) return
+  const result = deleteSnapshot(localStorage, viewType.value, snap.id)
+  if (!result.ok) {
+    toast(result.message, 'error')
+    return
+  }
+  if (renamingId.value === snap.id) renamingId.value = ''
+  reloadSnapshots()
+  toast(`已删除「${snap.name}」`, 'ok')
+}
+
+async function applyOne(snap) {
+  const ok = await confirmDialog({
+    title: '套用快照',
+    message: `用「${snap.name}」的 ${snap.items.length} 注替换当前${typeName.value}？这彩种篮里现有的 ${count.value} 注会被覆盖，其他彩种不动。`,
+    confirmText: '套用',
+    danger: false,
+  })
+  if (!ok) return
+  const result = installSnapshot(snap)
+  snapshotMsg.value = result.message
+  toast(result.message, result.ok ? 'ok' : 'error')
+}
+
+async function exportSnapshots() {
+  if (!snapshotList.value.length) {
+    toast('当前彩种还没有快照', 'info')
+    return
+  }
+  await copyText(exportSnapshotsText(localStorage, viewType.value), '已复制快照 JSON')
+}
+
+function importSnapshots() {
+  const result = importSnapshotsText(localStorage, viewType.value, snapshotImportText.value)
+  if (!result.ok) {
+    snapshotMsg.value = result.message
+    toast(result.message, 'error')
+    return
+  }
+  reloadSnapshots()
+  const parts = [`已导入 ${result.added} 个快照`]
+  if (result.skipped) parts.push(`跳过 ${result.skipped} 个`)
+  snapshotMsg.value = parts.join('，')
+  toast(snapshotMsg.value, result.added ? 'ok' : 'info')
+  if (result.added) snapshotImportText.value = ''
+}
 
 function resetManual() {
   const spec = profile.value
@@ -884,6 +1076,12 @@ watch(viewType, () => {
   verifyError.value = ''
   verifyIssue.value = ''
   verifyIssues.value = []
+  snapshotName.value = ''
+  snapshotMsg.value = ''
+  snapshotConflict.value = false
+  renamingId.value = ''
+  renameText.value = ''
+  reloadSnapshots()
   if (showVerify.value) loadVerifyIssues()
 })
 
@@ -895,7 +1093,9 @@ watch(() => visible.value.map((item) => item.id).join('|'), () => {
 })
 
 watch(isOpen, (open) => {
-  if (open) resetManual()
+  if (!open) return
+  resetManual()
+  reloadSnapshots()
 })
 
 onMounted(() => window.addEventListener('keydown', onKey))
