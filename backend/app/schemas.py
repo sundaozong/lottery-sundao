@@ -700,3 +700,60 @@ class MailPredictIn(BaseModel):
     lottery_type: str
     strategy: str = ""
     recommendations: list[Any] = []
+
+
+class FormCheckIn(BaseModel):
+    """一注体检。lottery_type / type 二选一；main 与 numbers 二选一。"""
+
+    lottery_type: str = ""
+    type: str = ""
+    main: Any = None
+    numbers: Any = None
+    special: Any = None
+    limit: int = Field(default=80, ge=5, le=200)
+
+
+class FormCheckMetric(BaseModel):
+    key: str
+    label: str
+    value: Optional[int] = None
+    display: str = ""
+    compared: str = ""
+    percentile: Optional[float] = None
+    band_low: Optional[float] = None
+    band_high: Optional[float] = None
+    band_label: str = ""
+    history_min: Optional[int] = None
+    history_max: Optional[int] = None
+    stance: str
+    stance_label: str
+    sample_size: int
+    note: str = ""
+
+
+class FormCheckSummary(BaseModel):
+    centered: int
+    low: int
+    high: int
+    unavailable: int
+
+
+class FormCheckQuery(BaseModel):
+    main: list[str]
+    special: list[str]
+
+
+class FormCheckOut(BaseModel):
+    lottery_type: str
+    mode: str
+    sample_size: int
+    limit: int
+    band: str
+    query: FormCheckQuery
+    metrics: list[FormCheckMetric]
+    special_metrics: list[FormCheckMetric]
+    summary: FormCheckSummary
+    glance: str
+    data_status: str
+    disclaimer: str
+    number_scope: str
