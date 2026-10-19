@@ -62,6 +62,27 @@ def normalize_type(t: str) -> str:
     return TYPE_ALIASES.get(t, t)
 
 
+def number_pools(lottery_type: str) -> tuple[list[str], list[str]]:
+    """主号池、特别号池。与分析里的当前遗漏使用同一套号码。"""
+    t = normalize_type(lottery_type)
+    if t == "ssq":
+        return [f"{i:02d}" for i in range(1, 34)], [f"{i:02d}" for i in range(1, 17)]
+    if t == "dlt":
+        return [f"{i:02d}" for i in range(1, 36)], [f"{i:02d}" for i in range(1, 13)]
+    if t in ("fc3d", "pl3"):
+        return [str(i) for i in range(10)], []
+    if t == "pl5":
+        return [str(i) for i in range(10)], []
+    if t == "qxc":
+        return [str(i) for i in range(10)], [str(i) for i in range(15)]
+    if t == "qlc":
+        nums = [f"{i:02d}" for i in range(1, 31)]
+        return nums, nums
+    if t == "kl8":
+        return [f"{i:02d}" for i in range(1, 81)], []
+    return [], []
+
+
 def parse_numbers(raw: Any) -> dict:
     """统一为 {main: [...], special: [...]}，数字为两位数或单位数字符串。"""
     if isinstance(raw, str):

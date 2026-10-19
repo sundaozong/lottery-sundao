@@ -4,27 +4,11 @@ import json
 from collections import Counter
 from sqlalchemy.orm import Session
 from ..models import Draw
-from ..lotteries import parse_numbers, normalize_type
+from ..lotteries import number_pools, parse_numbers, normalize_type
 
 
 def _pool(lottery_type: str) -> tuple[list[str], list[str]]:
-    t = normalize_type(lottery_type)
-    if t == "ssq":
-        return [f"{i:02d}" for i in range(1, 34)], [f"{i:02d}" for i in range(1, 17)]
-    if t == "dlt":
-        return [f"{i:02d}" for i in range(1, 36)], [f"{i:02d}" for i in range(1, 13)]
-    if t in ("fc3d", "pl3"):
-        return [str(i) for i in range(10)], []
-    if t == "pl5":
-        return [str(i) for i in range(10)], []
-    if t == "qxc":
-        return [str(i) for i in range(10)], [str(i) for i in range(15)]
-    if t == "qlc":
-        nums = [f"{i:02d}" for i in range(1, 31)]
-        return nums, nums
-    if t == "kl8":
-        return [f"{i:02d}" for i in range(1, 81)], []
-    return [], []
+    return number_pools(lottery_type)
 
 
 def analyze(db: Session, lottery_type: str, limit: int = 50, before_issue: str | None = None) -> dict:

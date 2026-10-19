@@ -780,6 +780,30 @@ class BetExpandIn(BaseModel):
     positions: Optional[list[BetExpandZoneIn]] = None
 
 
+class OmitStat(BaseModel):
+    n: str
+    current: int
+    avg: float
+    max: int
+    count: int
+    rate: float
+    ratio: float
+    last_issue: Optional[str] = None
+    cold: bool
+
+
+class OmitBoardOut(BaseModel):
+    lottery_type: str
+    limit: int
+    sample_size: int
+    sort: str
+    cold_rule: str
+    main: list[OmitStat]
+    special: list[OmitStat]
+    data_status: str
+    disclaimer: str
+
+
 class FormCheckOut(BaseModel):
     lottery_type: str
     mode: str

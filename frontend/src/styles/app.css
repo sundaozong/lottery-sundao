@@ -1473,3 +1473,98 @@ button.ball {
 }
 .replay-latest { margin-bottom: 8px; }
 .replay-block .table-wrap { margin-top: 8px; }
+
+/* ---------- 遗漏看板 ---------- */
+.omit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+.omit-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 6px 0 8px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.omit-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.omit-legend i.hot { background: var(--danger-dim); box-shadow: inset 0 0 0 1px var(--danger-border); }
+.omit-legend i.warm { background: var(--bg-elevated); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.omit-legend i.cool { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent-border); }
+.omit-legend i.cold { background: #d7e6f6; box-shadow: inset 0 0 0 1px #b7cce6; }
+.omit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 6px;
+  margin: 10px 0;
+}
+.omit-grid.scroll {
+  max-height: 248px;
+  overflow: auto;
+}
+.omit-cell {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 4px 2px 3px;
+  cursor: pointer;
+  line-height: 1.15;
+  font-family: var(--mono);
+}
+.omit-cell:hover { border-color: var(--border-strong); }
+.omit-n {
+  display: block;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.omit-cur {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.omit-cell.hot { background: var(--danger-dim); color: #8a3030; }
+.omit-cell.warm { background: var(--bg-elevated); }
+.omit-cell.cool { background: var(--accent-dim); color: var(--accent); }
+.omit-cell.cold { background: #e4eef8; color: #1d4e89; }
+.omit-cell.mark-dan { box-shadow: inset 0 0 0 2px var(--ball-red); }
+.omit-cell.mark-kill { box-shadow: inset 0 0 0 2px var(--text-muted); }
+.omit-cell.mark-pick { box-shadow: inset 0 0 0 2px var(--ball-green); }
+.omit-selected {
+  margin: 4px 0 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.omit-summary {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+.omit-table { max-height: 360px; overflow: auto; margin-top: 10px; }
+.omit-table-n {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--mono);
+  cursor: pointer;
+  padding: 0;
+}
+.omit-cold-row { background: var(--info-dim); }
+.omit-table td, .omit-table th { white-space: nowrap; }

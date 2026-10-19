@@ -11,6 +11,7 @@ const SOURCE_LABELS = {
   form: '体检',
   expand: '复式胆拖',
   replay: '回放',
+  omit: '遗漏',
 }
 
 const STRATEGY_LABELS = {

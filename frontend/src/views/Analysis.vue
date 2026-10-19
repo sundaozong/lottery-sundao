@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1>分析中心</h1>
-        <p>开奖走势 · 冷热频次 · 遗漏 · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a> · <a href="#zhenfu-pulse">振幅</a> · <a href="#junzhi-pulse">均值</a> · <a href="#zhongwei-pulse">中位数</a></p>
+        <p>开奖走势 · 冷热频次 · <a href="#omit-board">遗漏看板</a> · 热力 · 回声 · 结伴 · 撞车 · 脉搏 · 动量 · 邻号 · 跨度 · 连号簇 · 012路 · 和值 · 奇偶 · 质合 · 区位 · 尾数 · AC值 · 和尾 · 大小 · <a href="#shengping-pulse">升平降</a> · <a href="#zhenfu-pulse">振幅</a> · <a href="#junzhi-pulse">均值</a> · <a href="#zhongwei-pulse">中位数</a></p>
       </div>
     </div>
 
@@ -41,6 +41,8 @@
         :period-options="[50, 80, 120, 300]"
       />
     </div>
+
+    <OmitBoard :type="type" />
 
     <div class="mb-4">
       <div class="section-head">
@@ -3457,6 +3459,7 @@ import { api, TYPE_NAMES, ballClass, getMomentum, postMomentum, getNeighbor, pos
 import NumberBalls from '../components/NumberBalls.vue'
 import NumberPad from '../components/NumberPad.vue'
 import TrendChart from '../components/TrendChart.vue'
+import OmitBoard from '../components/OmitBoard.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { toast } from '../composables/feedback'
 import { useBasket } from '../composables/useBasket'

@@ -71,6 +71,10 @@
               @click="openConstraintReplay"
             >回放</button>
           </div>
+          <p class="strategy-desc">
+            <router-link :to="{ path: '/analysis', query: { type: lotteryType }, hash: '#omit-board' }">打开遗漏看板</router-link>
+            ，查看当前、平均和最大遗漏，把胆码和杀号写回这里。遗漏统计不参与脉动综合。
+          </p>
           <p v-if="strategy === 'pulse'" class="strategy-desc">脉动综合仍按现有打分排序。机选条件只用于热号、冷号、混合和随机。</p>
           <template v-else>
             <p class="strategy-desc">胆码必出、杀号必不出。数字彩按各位计奇偶、和值与跨度，重复保留；乐透按号码集合。未填的条件不生效。</p>
