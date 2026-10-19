@@ -183,6 +183,10 @@ export const api = {
   },
   zhongweiScore: (type, body) => request(`/api/analysis/${type}/zhongwei/score`, { method: 'POST', body: JSON.stringify(body) }),
   formCheck: (body) => request('/api/analysis/form-check', { method: 'POST', body: JSON.stringify(body) }),
+  omitBoard: (type, { limit = 80, sort = 'n' } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit), sort })
+    return request(`/api/analysis/${type}/omit-board?${params}`)
+  },
   betExpandRules: () => request('/api/bet-expand/rules'),
   betExpand: (body) => request('/api/bet-expand', { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => {
