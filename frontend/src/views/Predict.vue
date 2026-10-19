@@ -75,9 +75,57 @@
             <router-link :to="{ path: '/analysis', query: { type: lotteryType }, hash: '#omit-board' }">打开遗漏看板</router-link>
             ，查看当前、平均和最大遗漏，把胆码和杀号写回这里。遗漏统计不参与脉动综合。
           </p>
-          <p v-if="strategy === 'pulse'" class="strategy-desc">脉动综合仍按现有打分排序。机选条件只用于热号、冷号、混合和随机。</p>
+          <p v-if="strategy === 'pulse'" class="strategy-desc">脉动综合仍按现有打分排序。机选条件只用于热号、冷号、混合和随机。条件方案也只在这些策略下保存和套用。</p>
           <template v-else>
             <p class="strategy-desc">胆码必出、杀号必不出。数字彩按各位计奇偶、和值与跨度，重复保留；乐透按号码集合。未填的条件不生效。</p>
+            <div class="preset-bar">
+              <label class="form-label" for="constraint-preset">条件方案</label>
+              <select id="constraint-preset" v-model="selectedPresetId" class="form-select" @change="onPickPreset">
+                <option value="">不套用方案</option>
+                <optgroup label="内置">
+                  <option v-for="item in builtinPresetList" :key="item.id" :value="item.id">{{ presetLabel(item) }}</option>
+                </optgroup>
+                <optgroup v-if="userPresetList.length" label="我的方案">
+                  <option v-for="item in userPresetList" :key="item.id" :value="item.id">{{ presetLabel(item) }}</option>
+                </optgroup>
+              </select>
+              <p class="strategy-desc">选中后填入下方条件，并记在当前彩种。内置方案不能改，可以另存。</p>
+              <div class="preset-actions">
+                <button class="btn btn-ghost btn-sm" type="button" @click="startSavePreset">存为方案</button>
+                <button class="btn btn-ghost btn-sm" type="button" @click="startSavePresetAs">另存</button>
+                <button class="btn btn-ghost btn-sm" type="button" :disabled="!canEditPreset" :title="canEditPreset ? '改名' : '内置方案请另存'" @click="startRenamePreset">改名</button>
+                <button
+                  class="btn btn-sm"
+                  :class="deleteArmed ? 'btn-danger' : 'btn-ghost'"
+                  type="button"
+                  :disabled="!canEditPreset"
+                  :title="canEditPreset ? '删除我的方案' : '内置方案不能删除'"
+                  @click="removeSelectedPreset"
+                >{{ deleteArmed ? '确认删除' : '删除' }}</button>
+                <button class="btn btn-ghost btn-sm" type="button" :disabled="!selectedPreset" @click="copySelectedPreset">复制</button>
+                <button class="btn btn-ghost btn-sm" type="button" @click="importOpen = !importOpen">{{ importOpen ? '收起导入' : '导入' }}</button>
+              </div>
+              <div v-if="presetEditor" class="constraint-draft preset-name-row">
+                <input
+                  v-model="presetName"
+                  class="form-input"
+                  :placeholder="presetEditor === 'rename' ? '新的方案名称' : '方案名称，如周末均衡'"
+                  @keydown.enter.prevent="confirmPresetName"
+                />
+                <button class="btn btn-primary btn-sm" type="button" @click="confirmPresetName">{{ presetEditor === 'rename' ? '改名' : '保存' }}</button>
+                <button class="btn btn-ghost btn-sm" type="button" @click="cancelPresetEditor">取消</button>
+              </div>
+              <div v-if="presetConflict" class="preset-conflict">
+                <span class="form-hint">{{ presetMsg }}</span>
+                <button class="btn btn-ghost btn-sm" type="button" @click="confirmOverwritePreset">覆盖</button>
+                <button class="btn btn-ghost btn-sm" type="button" @click="renameFromConflict">改名</button>
+              </div>
+              <p v-else-if="presetMsg" class="form-hint">{{ presetMsg }}</p>
+              <div v-if="importOpen" class="preset-import">
+                <textarea v-model="importText" class="form-textarea" rows="4" placeholder="粘贴方案 JSON"></textarea>
+                <button class="btn btn-ghost btn-sm" type="button" @click="importPresetFromText">导入到当前彩种</button>
+              </div>
+            </div>
             <div class="chip-row compact">
               <button type="button" class="chip" :class="{ active: oddBalanced }" @click="toggleOddBalance">奇偶接近</button>
               <button
@@ -399,6 +447,17 @@ import AppIcon from '../components/AppIcon.vue'
 import { toast } from '../composables/feedback'
 import { useBasket } from '../composables/useBasket'
 import { bandText, meterLayout, stanceClass, tokenize } from '../lib/formCheck'
+import {
+  PRESET_STRATEGIES,
+  applyPreset,
+  blankPanelConstraints,
+  deletePreset,
+  exportPresetText,
+  importPresetText,
+  listPresets,
+  renamePreset,
+  savePreset,
+} from '../lib/constraintPresets'
 import { useReplay } from '../composables/useReplay'
 
 const basket = useBasket()
@@ -418,24 +477,14 @@ const LOTTERY_META = {
 }
 
 function blankConstraints() {
-  return {
-    include_main: [],
-    exclude_main: [],
-    include_special: [],
-    exclude_special: [],
-    odd_min: '',
-    odd_max: '',
-    sum_min: '',
-    sum_max: '',
-    span_min: '',
-    span_max: '',
-    max_consecutive: '',
-    big_min: '',
-    big_max: '',
-    zone1: '',
-    zone2: '',
-    zone3: '',
-  }
+  return blankPanelConstraints()
+}
+
+const PRESET_STRATEGY_LABELS = {
+  hot: '热号',
+  cold: '冷号',
+  hybrid: '混合',
+  random: '随机',
 }
 
 const lotteryType = ref('ssq')
@@ -448,6 +497,15 @@ const result = ref(null)
 const recent = ref([])
 const recentLoading = ref(false)
 const constraints = ref(blankConstraints())
+const presetTick = ref(0)
+const selectedPresetId = ref('')
+const presetName = ref('')
+const presetEditor = ref('')
+const presetConflict = ref(null)
+const presetMsg = ref('')
+const importOpen = ref(false)
+const importText = ref('')
+const deleteArmed = ref(false)
 const drafts = ref({ includeMain: '', excludeMain: '', includeSpecial: '', excludeSpecial: '' })
 const storageReady = ref(false)
 const formMain = ref('')
@@ -507,6 +565,15 @@ const oddBalanced = computed(() => (
   String(constraints.value.odd_min) === String(oddBalance.value.min)
   && String(constraints.value.odd_max) === String(oddBalance.value.max)
 ))
+
+const presetCatalog = computed(() => {
+  presetTick.value
+  return listPresets(localStorage, lotteryType.value)
+})
+const builtinPresetList = computed(() => presetCatalog.value.filter((item) => item.builtin))
+const userPresetList = computed(() => presetCatalog.value.filter((item) => !item.builtin))
+const selectedPreset = computed(() => presetCatalog.value.find((item) => item.id === selectedPresetId.value) || null)
+const canEditPreset = computed(() => Boolean(selectedPreset.value && !selectedPreset.value.builtin))
 
 const bigHint = computed(() => (
   lotteryMeta.value.digit ? '0–4 为小，5–9 为大' : '小于等于号码池中点为小，大于中点为大'
@@ -597,6 +664,236 @@ function toggleConsecutive() {
 function clearConstraints() {
   constraints.value = blankConstraints()
   drafts.value = { includeMain: '', excludeMain: '', includeSpecial: '', excludeSpecial: '' }
+  selectedPresetId.value = ''
+  presetMsg.value = ''
+  presetConflict.value = null
+}
+
+function presetLabel(item) {
+  const label = PRESET_STRATEGY_LABELS[item.strategy]
+  return label ? `${item.name} · ${label}` : item.name
+}
+
+function currentPresetStrategy() {
+  return PRESET_STRATEGIES.includes(strategy.value) ? strategy.value : ''
+}
+
+function resetPresetEditor() {
+  presetEditor.value = ''
+  presetName.value = ''
+  presetConflict.value = null
+  deleteArmed.value = false
+}
+
+function applyPresetSelection(preset) {
+  const applied = applyPreset(localStorage, preset)
+  constraints.value = applied.constraints
+  if (applied.strategy) strategy.value = applied.strategy
+  selectedPresetId.value = preset.id
+  presetTick.value += 1
+  return applied
+}
+
+function onPickPreset() {
+  deleteArmed.value = false
+  presetConflict.value = null
+  const preset = selectedPreset.value
+  if (!preset) {
+    presetMsg.value = ''
+    return
+  }
+  applyPresetSelection(preset)
+  presetEditor.value = ''
+  presetMsg.value = preset.builtin ? `已套用内置方案「${preset.name}」` : `已套用「${preset.name}」`
+}
+
+function finishPresetSave(result, name) {
+  if (!result.ok && result.status === 'conflict') {
+    presetConflict.value = { name, source: 'save' }
+    presetMsg.value = result.message
+    return
+  }
+  if (!result.ok) {
+    presetMsg.value = result.message
+    toast(result.message, 'error')
+    return
+  }
+  presetTick.value += 1
+  selectedPresetId.value = result.preset.id
+  presetEditor.value = ''
+  presetConflict.value = null
+  presetMsg.value = `已保存方案「${result.preset.name}」`
+  toast(presetMsg.value, 'ok')
+}
+
+function startSavePreset() {
+  deleteArmed.value = false
+  presetConflict.value = null
+  if (selectedPreset.value && !selectedPreset.value.builtin) {
+    const result = savePreset(localStorage, {
+      id: selectedPreset.value.id,
+      lotteryType: lotteryType.value,
+      name: selectedPreset.value.name,
+      strategy: currentPresetStrategy(),
+      constraints: constraints.value,
+    })
+    finishPresetSave(result, selectedPreset.value.name)
+    return
+  }
+  presetEditor.value = 'save'
+  presetName.value = selectedPreset.value?.builtin ? `${selectedPreset.value.name}·我的` : ''
+}
+
+function startSavePresetAs() {
+  deleteArmed.value = false
+  presetConflict.value = null
+  const base = selectedPreset.value?.name || '我的方案'
+  presetEditor.value = 'saveAs'
+  presetName.value = `${base} 副本`
+}
+
+function startRenamePreset() {
+  if (!canEditPreset.value) return
+  deleteArmed.value = false
+  presetConflict.value = null
+  presetEditor.value = 'rename'
+  presetName.value = selectedPreset.value.name
+}
+
+function cancelPresetEditor() {
+  presetEditor.value = ''
+  presetConflict.value = null
+}
+
+function confirmPresetName() {
+  const name = presetName.value.trim()
+  if (!name) {
+    presetMsg.value = '请填写方案名称'
+    toast(presetMsg.value, 'error')
+    return
+  }
+  if (presetEditor.value === 'rename') {
+    const result = renamePreset(localStorage, lotteryType.value, selectedPreset.value?.id, name)
+    if (!result.ok) {
+      presetMsg.value = result.message
+      toast(result.message, result.status === 'conflict' ? 'info' : 'error')
+      return
+    }
+    presetTick.value += 1
+    presetEditor.value = ''
+    presetMsg.value = `已改名为「${result.preset.name}」`
+    toast(presetMsg.value, 'ok')
+    return
+  }
+  const result = savePreset(localStorage, {
+    lotteryType: lotteryType.value,
+    name,
+    strategy: currentPresetStrategy(),
+    constraints: constraints.value,
+  })
+  finishPresetSave(result, name)
+}
+
+function confirmOverwritePreset() {
+  if (!presetConflict.value) return
+  const conflict = presetConflict.value
+  const result = conflict.source === 'import'
+    ? importPresetText(localStorage, lotteryType.value, importText.value, { overwrite: true })
+    : savePreset(localStorage, {
+      lotteryType: lotteryType.value,
+      name: conflict.name,
+      strategy: currentPresetStrategy(),
+      constraints: constraints.value,
+    }, { overwrite: true })
+  if (!result.ok) {
+    presetConflict.value = null
+    presetMsg.value = result.message
+    toast(result.message, 'error')
+    return
+  }
+  if (conflict.source === 'import') applyPresetSelection(result.preset)
+  else {
+    presetTick.value += 1
+    selectedPresetId.value = result.preset.id
+  }
+  presetEditor.value = ''
+  presetConflict.value = null
+  if (conflict.source === 'import') {
+    importOpen.value = false
+    importText.value = ''
+  }
+  presetMsg.value = `已覆盖方案「${result.preset.name}」`
+  toast(presetMsg.value, 'ok')
+}
+
+function renameFromConflict() {
+  if (presetConflict.value?.source === 'import') {
+    presetMsg.value = '请改掉文本里的方案名称，或点覆盖'
+    return
+  }
+  presetEditor.value = 'save'
+  if (presetConflict.value?.name) presetName.value = presetConflict.value.name
+  presetConflict.value = null
+}
+
+function removeSelectedPreset() {
+  if (!canEditPreset.value) return
+  if (!deleteArmed.value) {
+    deleteArmed.value = true
+    presetMsg.value = `再点一次，删除「${selectedPreset.value.name}」`
+    return
+  }
+  const name = selectedPreset.value.name
+  const result = deletePreset(localStorage, lotteryType.value, selectedPreset.value.id)
+  deleteArmed.value = false
+  if (!result.ok) {
+    presetMsg.value = result.message
+    toast(result.message, 'error')
+    return
+  }
+  selectedPresetId.value = ''
+  presetTick.value += 1
+  presetEditor.value = ''
+  presetMsg.value = `已删除「${name}」`
+  toast(presetMsg.value, 'ok')
+}
+
+async function copySelectedPreset() {
+  if (!selectedPreset.value) return
+  deleteArmed.value = false
+  const text = exportPresetText(selectedPreset.value)
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard')
+    await navigator.clipboard.writeText(text)
+    presetMsg.value = '已复制方案 JSON'
+    toast(presetMsg.value, 'ok')
+  } catch {
+    importText.value = text
+    importOpen.value = true
+    presetMsg.value = '复制失败，已放到文本框，请手动复制'
+    toast(presetMsg.value, 'info')
+  }
+}
+
+function importPresetFromText() {
+  const result = importPresetText(localStorage, lotteryType.value, importText.value)
+  if (!result.ok && result.status === 'conflict') {
+    presetConflict.value = { name: result.name, source: 'import' }
+    presetMsg.value = result.message
+    return
+  }
+  if (!result.ok) {
+    presetMsg.value = result.message
+    toast(result.message, 'error')
+    return
+  }
+  applyPresetSelection(result.preset)
+  presetEditor.value = ''
+  presetConflict.value = null
+  importOpen.value = false
+  importText.value = ''
+  presetMsg.value = `已导入方案「${result.preset.name}」`
+  toast(presetMsg.value, 'ok')
 }
 
 function numericOrNull(value) {
@@ -802,6 +1099,11 @@ watch(lotteryType, () => {
   basket.setViewType(lotteryType.value)
   result.value = null
   mailMsg.value = ''
+  resetPresetEditor()
+  presetMsg.value = ''
+  importOpen.value = false
+  importText.value = ''
+  selectedPresetId.value = ''
   if (!applyingCheck) {
     formReport.value = null
     formMain.value = ''

@@ -235,6 +235,34 @@
   align-items: center;
 }
 .constraint-draft .form-input { flex: 1; min-width: 0; }
+.preset-bar { margin: 2px 0 14px; }
+.preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.preset-name-row { margin-top: 8px; }
+.preset-conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.preset-conflict .form-hint { margin-top: 0; }
+.preset-import {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+.preset-import .form-textarea {
+  min-height: 88px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
 .constraint-chip-row { margin-top: 8px; margin-bottom: 0; }
 .form-check-body { margin-top: 16px; }
 .form-check-head {
