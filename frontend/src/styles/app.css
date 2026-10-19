@@ -1378,6 +1378,25 @@ button.ball {
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
 }
+.basket-prune {
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.basket-prune > .btn { margin-bottom: 10px; }
+.basket-prune-threshold {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.basket-prune-threshold .form-label { margin: 0; }
+.basket-prune-threshold .form-input {
+  width: 4.75rem;
+  padding: 7px 8px;
+}
+.basket-prune-threshold .btn { margin-bottom: 0; }
+.basket-item.is-prune { border-color: #8ea4bb; }
 .basket-coverage .card-title { margin-bottom: 8px; }
 .basket-coverage-label {
   margin-bottom: 8px;
