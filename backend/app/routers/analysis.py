@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas import AcIn, ClusterIn, CollisionIn, DaxiaoIn, DaxiaoOut, DaxiaoScoreOut, EchoIn, HeweiIn, JunzhiIn, JunzhiOut, JunzhiScoreOut, MomentumIn, NeighborIn, ParityIn, PrimeIn, RepeatIn, RoadIn, ShengpingIn, ShengpingOut, ShengpingScoreOut, SpanIn, SumIn, TailIn, ZhenfuIn, ZhenfuOut, ZhenfuScoreOut, ZhongweiIn, ZhongweiOut, ZhongweiScoreOut, ZoneIn
+from ..schemas import AcIn, ClusterIn, CollisionIn, DaxiaoIn, DaxiaoOut, DaxiaoScoreOut, EchoIn, FormCheckIn, FormCheckOut, HeweiIn, JunzhiIn, JunzhiOut, JunzhiScoreOut, MomentumIn, NeighborIn, ParityIn, PrimeIn, RepeatIn, RoadIn, ShengpingIn, ShengpingOut, ShengpingScoreOut, SpanIn, SumIn, TailIn, ZhenfuIn, ZhenfuOut, ZhenfuScoreOut, ZhongweiIn, ZhongweiOut, ZhongweiScoreOut, ZoneIn
 from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
 from ..services.collision import collide, collide_records
@@ -25,6 +25,7 @@ from ..services.tail import score_tail, tail_summary
 from ..services.zone import score_zone, zone_summary
 from ..services.sum_pulse import score_sum, sum_summary
 from ..services.shape import shape_stats
+from ..services.form_check import check_form
 from ..services.seed import ensure_seed
 from ..lotteries import normalize_type
 
@@ -748,6 +749,45 @@ def post_echo(lottery_type: str, body: EchoIn, db: Session = Depends(get_db)):
             limit=body.limit,
             top=body.top,
         )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+def _form_ticket(body: FormCheckIn):
+    lottery = (body.lottery_type or body.type or "").strip()
+    main = body.main
+    special = body.special
+    if main is None and body.numbers is not None:
+        if isinstance(body.numbers, dict):
+            main = body.numbers.get("main", body.numbers.get("red", body.numbers.get("front")))
+            if special is None:
+                special = body.numbers.get("special", body.numbers.get("blue", body.numbers.get("back")))
+        else:
+            main = body.numbers
+    return lottery, main, special
+
+
+@router.get("/form-check", response_model=FormCheckOut)
+def get_form_check(
+    type: str = Query(..., description="彩种"),
+    numbers: str = Query(..., description="主号，空格或逗号分隔"),
+    special: str | None = Query(None, description="特别号，不并进主号指标"),
+    limit: int = Query(80, ge=5, le=200),
+    db: Session = Depends(get_db),
+):
+    ensure_seed(db)
+    try:
+        return check_form(db, type, numbers, special, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/form-check", response_model=FormCheckOut)
+def post_form_check(body: FormCheckIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    lottery, main, special = _form_ticket(body)
+    try:
+        return check_form(db, lottery, main, special, limit=body.limit)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

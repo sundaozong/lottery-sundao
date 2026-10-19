@@ -182,6 +182,7 @@ export const api = {
     return request(`/api/analysis/${type}/zhongwei?${params}`)
   },
   zhongweiScore: (type, body) => request(`/api/analysis/${type}/zhongwei/score`, { method: 'POST', body: JSON.stringify(body) }),
+  formCheck: (body) => request('/api/analysis/form-check', { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => {
     const payload = {
       lottery_type: body.lottery_type,

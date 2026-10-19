@@ -235,6 +235,7 @@
                   <span class="predict-row-label">方案 {{ i + 1 }}</span>
                   <NumberBalls :numbers="rec" :type="result.lottery_type" />
                   <span class="pulse-score" :title="'综合 ' + formatScore(rec.score)">{{ formatScore(rec.score) }}</span>
+                  <button class="btn btn-ghost btn-sm basket-add" type="button" @click="checkRec(rec)">体检</button>
                   <button class="btn btn-ghost btn-sm basket-add" type="button" @click="addRec(rec)">加入选号篮</button>
                 </div>
                 <p class="pulse-rationale">{{ rec.rationale }}</p>
@@ -259,6 +260,7 @@
                 <div class="predict-row-main">
                   <span class="predict-row-label">方案 {{ i + 1 }}</span>
                   <NumberBalls :numbers="rec" :type="result.lottery_type" />
+                  <button class="btn btn-ghost btn-sm basket-add" type="button" @click="checkRec(rec)">体检</button>
                   <button class="btn btn-ghost btn-sm basket-add" type="button" @click="addRec(rec)">加入选号篮</button>
                 </div>
                 <p v-if="rec.constraint_summary" class="constraint-summary">{{ rec.constraint_summary }}</p>
@@ -275,6 +277,76 @@
           <div class="ph-icon"><AppIcon name="sparkle" :size="24" /></div>
           <div class="ph-title">还没有推荐方案</div>
           <div class="ph-desc">选择彩种与策略，点击「生成推荐」获取娱乐号码</div>
+        </div>
+
+        <div id="form-check" class="card mb-4">
+          <div class="card-title">
+            一注体检
+            <span class="sub">对照历史常见带 · 不是推荐</span>
+          </div>
+          <p class="strategy-desc">贴入或点上方方案的「体检」。看这注和值、跨度、奇偶、区位、AC、尾数、和尾、012路落在历史 p25–p75 的哪一侧。特别号单独看，不并进主号。</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">主号</label>
+              <input
+                v-model="formMain"
+                class="form-input"
+                :placeholder="formMainPlaceholder"
+                @keydown.enter.prevent="runFormCheck"
+              />
+            </div>
+            <div v-if="lotteryMeta.special" class="form-group">
+              <label class="form-label">特别号</label>
+              <input
+                v-model="formSpecial"
+                class="form-input"
+                placeholder="特别号"
+                @keydown.enter.prevent="runFormCheck"
+              />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary btn-sm" type="button" :disabled="formLoading" @click="runFormCheck">
+              {{ formLoading ? '对照中…' : '体检' }}
+            </button>
+            <button class="btn btn-ghost btn-sm" type="button" :disabled="!formReport" @click="addChecked">加入选号篮</button>
+          </div>
+
+          <div v-if="formReport" class="form-check-body">
+            <div class="form-check-head">
+              <div class="form-check-glance">{{ formReport.glance }}</div>
+              <span class="text-xs text-muted">样本 {{ formReport.sample_size }} 期</span>
+            </div>
+            <div class="form-check-list">
+              <div v-for="item in formReport.metrics" :key="item.key" class="form-check-row">
+                <span class="form-check-name">{{ item.label }}</span>
+                <span class="form-check-value">{{ item.display || '—' }}</span>
+                <span class="form-check-band">
+                  {{ bandText(item) }}
+                  <span v-if="meterLayout(item)" class="form-check-meter" aria-hidden="true">
+                    <span
+                      class="form-check-meter-band"
+                      :style="{ left: meterLayout(item).bandLeft + '%', width: meterLayout(item).bandWidth + '%' }"
+                    />
+                    <span class="form-check-meter-mark" :style="{ left: meterLayout(item).mark + '%' }" />
+                  </span>
+                </span>
+                <span class="badge" :class="stanceClass(item.stance)">{{ item.stance_label }}</span>
+              </div>
+            </div>
+            <template v-if="formReport.special_metrics?.length">
+              <div class="form-check-special-title">特别号 · 不计入主号</div>
+              <div class="form-check-list">
+                <div v-for="item in formReport.special_metrics" :key="'s-' + item.key" class="form-check-row">
+                  <span class="form-check-name">{{ item.label }}</span>
+                  <span class="form-check-value">{{ item.display || '—' }}</span>
+                  <span class="form-check-band">{{ bandText(item) }}</span>
+                  <span class="badge" :class="stanceClass(item.stance)">{{ item.stance_label }}</span>
+                </div>
+              </div>
+            </template>
+            <p class="form-hint">{{ formReport.disclaimer }}</p>
+          </div>
         </div>
       </div>
 
@@ -304,13 +376,17 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api, TYPE_NAMES } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { toast } from '../composables/feedback'
 import { useBasket } from '../composables/useBasket'
+import { bandText, meterLayout, stanceClass, tokenize } from '../lib/formCheck'
 
 const basket = useBasket()
+const route = useRoute()
+const router = useRouter()
 
 const LOTTERY_META = {
   ssq: { digit: false, need: 6, special: true, mainLo: 1, mainHi: 33, specLo: 1, specHi: 16, width: 2 },
@@ -356,6 +432,11 @@ const recentLoading = ref(false)
 const constraints = ref(blankConstraints())
 const drafts = ref({ includeMain: '', excludeMain: '', includeSpecial: '', excludeSpecial: '' })
 const storageReady = ref(false)
+const formMain = ref('')
+const formSpecial = ref('')
+const formReport = ref(null)
+const formLoading = ref(false)
+let applyingCheck = false
 
 const STRATEGY_NAMES = {
   hot: '热号加权',
@@ -393,6 +474,10 @@ const lotteryMeta = computed(() => LOTTERY_META[lotteryType.value] || LOTTERY_ME
 
 const numberPlaceholder = computed(() => (
   lotteryMeta.value.digit ? '如 7，回车加入' : '如 03 07，回车加入'
+))
+
+const formMainPlaceholder = computed(() => (
+  lotteryMeta.value.digit ? '如 1 2 3，空格或逗号' : '如 01 05 12 18 25 33'
 ))
 
 const oddBalance = computed(() => {
@@ -566,6 +651,61 @@ async function run() {
   }
 }
 
+async function runFormCheck() {
+  formLoading.value = true
+  try {
+    const special = lotteryMeta.value.special ? tokenize(formSpecial.value) : []
+    formReport.value = await api.formCheck({
+      lottery_type: lotteryType.value,
+      main: tokenize(formMain.value),
+      special,
+      limit: 80,
+    })
+  } catch (e) {
+    formReport.value = null
+    toast(e.message, 'error', 4000)
+  } finally {
+    formLoading.value = false
+  }
+}
+
+function checkRec(rec) {
+  formMain.value = (rec.main || []).join(' ')
+  formSpecial.value = (rec.special || []).join(' ')
+  runFormCheck().then(() => {
+    document.getElementById('form-check')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function addChecked() {
+  const report = formReport.value
+  if (!report) return
+  const outcome = basket.add({
+    lottery_type: report.lottery_type,
+    numbers: { main: report.query.main, special: report.query.special },
+    source: 'form',
+  })
+  const kind = outcome.status === 'added' ? 'ok' : outcome.status === 'duplicate' ? 'info' : 'error'
+  toast(outcome.message, kind)
+}
+
+async function applyRouteCheck(query) {
+  if (!query?.check) return
+  const type = String(query.check)
+  const main = String(query.main || '').replace(/,/g, ' ')
+  const special = String(query.special || '').replace(/,/g, ' ')
+  applyingCheck = true
+  try {
+    if (TYPE_NAMES[type] && type !== lotteryType.value) lotteryType.value = type
+    formMain.value = main
+    formSpecial.value = special
+    await runFormCheck()
+    router.replace({ path: '/predict', query: {} })
+  } finally {
+    applyingCheck = false
+  }
+}
+
 function addRec(rec) {
   if (!result.value) return
   const outcome = basket.add({
@@ -619,6 +759,11 @@ watch(lotteryType, () => {
   basket.setViewType(lotteryType.value)
   result.value = null
   mailMsg.value = ''
+  if (!applyingCheck) {
+    formReport.value = null
+    formMain.value = ''
+    formSpecial.value = ''
+  }
   storageReady.value = false
   constraints.value = loadConstraints(lotteryType.value)
   drafts.value = { includeMain: '', excludeMain: '', includeSpecial: '', excludeSpecial: '' }
@@ -633,10 +778,15 @@ watch(strategy, () => {
   mailMsg.value = ''
 })
 
+watch(() => route.query.check, (value) => {
+  if (value) applyRouteCheck(route.query)
+})
+
 onMounted(() => {
   basket.setViewType(lotteryType.value)
   constraints.value = loadConstraints(lotteryType.value)
   storageReady.value = true
   loadRecent()
+  if (route.query.check) applyRouteCheck(route.query)
 })
 </script>

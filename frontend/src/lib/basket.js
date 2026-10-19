@@ -8,6 +8,7 @@ const SOURCE_LABELS = {
   predict: '预测',
   manual: '手选',
   analysis: '回声',
+  form: '体检',
 }
 
 const STRATEGY_LABELS = {

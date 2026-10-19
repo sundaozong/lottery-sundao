@@ -72,6 +72,7 @@
             <div class="basket-item-top">
               <span class="predict-row-label">第 {{ index + 1 }} 注</span>
               <span class="text-xs text-muted">{{ sourceText(item) }} · {{ timeLabel(item.added_at) }}</span>
+              <button class="btn btn-ghost btn-sm" type="button" @click="checkItem(item)">体检</button>
               <button class="icon-btn danger" type="button" title="移出" aria-label="移出这注" @click="remove(item.id)">
                 <AppIcon name="trash" />
               </button>
@@ -178,6 +179,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
 import { useBasket } from '../composables/useBasket'
@@ -202,6 +204,8 @@ const {
   clearAll,
   dropIds,
 } = useBasket()
+
+const router = useRouter()
 
 const issue = ref('')
 const multiple = ref(1)
@@ -256,6 +260,18 @@ function betsOf(item) {
 
 function costOf(item) {
   return lineCost(item.lottery_type, item.numbers, multiple.value)
+}
+
+function checkItem(item) {
+  hide()
+  router.push({
+    path: '/predict',
+    query: {
+      check: item.lottery_type,
+      main: (item.numbers?.main || []).join(','),
+      special: (item.numbers?.special || []).join(','),
+    },
+  })
 }
 
 function addManual() {

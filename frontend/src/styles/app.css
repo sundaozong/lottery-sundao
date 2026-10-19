@@ -236,6 +236,70 @@
 }
 .constraint-draft .form-input { flex: 1; min-width: 0; }
 .constraint-chip-row { margin-top: 8px; margin-bottom: 0; }
+.form-check-body { margin-top: 16px; }
+.form-check-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.form-check-glance {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.form-check-list { display: flex; flex-direction: column; }
+.form-check-row {
+  display: grid;
+  grid-template-columns: 72px minmax(64px, 0.8fr) minmax(140px, 1.6fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+.form-check-name { color: var(--text-secondary); font-size: 0.82rem; }
+.form-check-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+}
+.form-check-band { color: var(--text-muted); font-size: 0.78rem; }
+.form-check-meter {
+  position: relative;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+}
+.form-check-meter-band {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+.form-check-meter-mark {
+  position: absolute;
+  top: -2px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 99px;
+  background: var(--text);
+}
+.form-check-special-title {
+  margin-top: 14px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+@media (max-width: 720px) {
+  .form-check-row {
+    grid-template-columns: 64px 1fr auto;
+  }
+  .form-check-band { grid-column: 1 / -1; }
+}
 .predict-row-label {
   flex: 0 0 64px;
   font-size: 0.82rem;
