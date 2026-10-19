@@ -438,7 +438,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, TYPE_NAMES } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
@@ -446,6 +446,7 @@ import BetExpander from '../components/BetExpander.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { toast } from '../composables/feedback'
 import { useBasket } from '../composables/useBasket'
+import { CONSTRAINTS_UPDATED_EVENT } from '../lib/basketCoverage'
 import { bandText, meterLayout, stanceClass, tokenize } from '../lib/formCheck'
 import {
   PRESET_STRATEGIES,
@@ -1127,11 +1128,23 @@ watch(() => route.query.check, (value) => {
   if (value) applyRouteCheck(route.query)
 })
 
+function onConstraintsUpdated(event) {
+  if (event?.detail?.lotteryType !== lotteryType.value) return
+  storageReady.value = false
+  constraints.value = loadConstraints(lotteryType.value)
+  storageReady.value = true
+}
+
 onMounted(() => {
   basket.setViewType(lotteryType.value)
   constraints.value = loadConstraints(lotteryType.value)
   storageReady.value = true
   loadRecent()
   if (route.query.check) applyRouteCheck(route.query)
+  window.addEventListener(CONSTRAINTS_UPDATED_EVENT, onConstraintsUpdated)
+})
+
+onUnmounted(() => {
+  window.removeEventListener(CONSTRAINTS_UPDATED_EVENT, onConstraintsUpdated)
 })
 </script>

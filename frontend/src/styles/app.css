@@ -1373,6 +1373,83 @@ button.ball {
   font-size: 0.72rem;
   color: var(--text-muted);
 }
+.basket-coverage {
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.basket-coverage .card-title { margin-bottom: 8px; }
+.basket-coverage-label {
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.basket-coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.coverage-ball {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: #e7ebf0;
+  color: #3c4654;
+  font-family: var(--mono);
+  cursor: pointer;
+  padding: 0;
+  appearance: none;
+}
+.coverage-ball .coverage-num {
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.coverage-ball .coverage-count {
+  font-size: 0.52rem;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0.82;
+}
+.coverage-ball[data-heat="0"] {
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-muted);
+}
+.coverage-ball[data-heat="0"] .coverage-num { font-weight: 500; }
+.coverage-ball[data-heat="1"] { background: #e7ebf0; color: #3c4654; }
+.coverage-ball[data-heat="2"] { background: #d5dee8; color: #2c3948; }
+.coverage-ball[data-heat="3"] { background: #b7c6d6; color: #1e2a36; }
+.coverage-ball[data-heat="4"] { background: #8ea4bb; color: #fff; }
+.coverage-ball[data-heat="5"] { background: #6d849c; color: #fff; }
+.coverage-ball.is-hot { box-shadow: inset 0 0 0 1.5px #7d8fa8; }
+.coverage-ball.is-on,
+.coverage-ball:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.coverage-ball:hover { filter: brightness(0.98); }
+.basket-coverage-more { margin: 0 0 8px; }
+.basket-coverage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.basket-coverage-actions .btn { margin-bottom: 0; }
+.basket-item.is-focus {
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+}
+.basket-item.is-dim { opacity: 0.45; }
+.basket-item.is-hot { box-shadow: inset 3px 0 0 #7d8fa8; }
 .basket-list {
   display: flex;
   flex-direction: column;
