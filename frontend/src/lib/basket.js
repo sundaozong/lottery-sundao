@@ -12,6 +12,7 @@ const SOURCE_LABELS = {
   expand: '复式胆拖',
   replay: '回放',
   omit: '遗漏',
+  paste: '粘贴',
 }
 
 const STRATEGY_LABELS = {

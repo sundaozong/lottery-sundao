@@ -64,7 +64,7 @@
         <div v-if="!visible.length" class="empty">
           <div class="icon"><AppIcon name="inbox" :size="22" /></div>
           <div class="empty-title">这彩种还是空的</div>
-          <div class="empty-desc">从预测页加入，或在下面手工点一注</div>
+          <div class="empty-desc">从预测页加入，或在下面粘贴、手工点一注</div>
         </div>
 
         <div v-else class="basket-list">
@@ -82,6 +82,32 @@
             <p v-if="item.note" class="form-hint">{{ item.note }}</p>
             <p v-if="betsOf(item) > 1" class="form-hint">按复式计 {{ betsOf(item) }} 注 · ¥ {{ costOf(item) }}</p>
           </div>
+        </div>
+
+        <div class="basket-paste">
+          <button class="btn btn-ghost btn-sm" type="button" @click="showPaste = !showPaste">
+            {{ showPaste ? '收起粘贴导入' : '粘贴导入' }}
+          </button>
+          <template v-if="showPaste">
+            <label class="form-label" for="basket-paste-input">一行一注</label>
+            <p class="form-hint">号码之间用空格或逗号，特别号前加 + 或 |。空行、彩种名和免责声明会跳过。</p>
+            <textarea
+              id="basket-paste-input"
+              v-model="pasteText"
+              class="form-textarea basket-paste-input"
+              rows="5"
+              :placeholder="pastePlaceholder"
+              spellcheck="false"
+            />
+            <p v-if="pasteActive" class="basket-paste-summary">
+              将加入 {{ pastePreview.added }} · 重复 {{ pastePreview.duplicates }} · 无效 {{ pastePreview.invalidCount }}
+            </p>
+            <ul v-if="pastePreview.errors.length" class="basket-paste-errors">
+              <li v-for="err in pastePreview.errors" :key="err.line">第 {{ err.line }} 行：{{ err.message }}</li>
+            </ul>
+            <p v-if="pastePreview.invalidCount > pastePreview.errors.length" class="form-hint">其余无效行已省略</p>
+            <button class="btn btn-primary btn-sm" type="button" @click="confirmPaste">解析并放入</button>
+          </template>
         </div>
 
         <div class="basket-manual">
@@ -183,6 +209,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
+import { previewBasketPaste } from '../lib/basketPaste'
 import { useBasket } from '../composables/useBasket'
 import { useReplay } from '../composables/useReplay'
 import { confirmDialog, toast } from '../composables/feedback'
@@ -201,6 +228,7 @@ const {
   setViewType,
   hide,
   add,
+  addMany,
   remove,
   clearCurrent,
   clearAll,
@@ -215,6 +243,8 @@ const multiple = ref(1)
 const removeAfter = ref(true)
 const saving = ref(false)
 const showManual = ref(false)
+const showPaste = ref(false)
+const pasteText = ref('')
 const manualMain = ref([])
 const manualSpecial = ref([])
 const manualPositions = ref([])
@@ -226,6 +256,21 @@ const previewCost = computed(() => visible.value.reduce(
   (sum, item) => sum + lineCost(item.lottery_type, item.numbers, multiple.value),
   0,
 ))
+const pastePreview = computed(() => previewBasketPaste(visible.value, viewType.value, pasteText.value))
+const pasteActive = computed(() => pastePreview.value.drafts.length > 0 || pastePreview.value.invalidCount > 0)
+const pastePlaceholder = computed(() => {
+  const spec = profile.value
+  if (!spec) return ''
+  if (viewType.value === 'kl8') return '01 02 03 04 05'
+  if (spec.mode === 'digit') {
+    const main = Array.from({ length: spec.mainCount }, (_, index) => String((index + 1) % 10)).join(' ')
+    return spec.specCount ? `${main} + 7` : main
+  }
+  const main = Array.from({ length: spec.mainCount }, (_, index) => String(index + 1).padStart(spec.width, '0')).join(' ')
+  if (!spec.specCount) return main
+  const special = Array.from({ length: spec.specCount }, (_, index) => String(index + 1).padStart(spec.width, '0')).join(' ')
+  return `${main} + ${special}`
+})
 const manualHint = computed(() => {
   if (viewType.value === 'kl8') return '点 1–10 个，按选一到选十记一注。预测生成的 20 个号会按选十复式计费。'
   if (profile.value?.mode === 'digit') return '每个位置点一个数字。顺序就是号码。'
@@ -282,6 +327,28 @@ function checkItem(item) {
       special: (item.numbers?.special || []).join(','),
     },
   })
+}
+
+function confirmPaste() {
+  const summary = pastePreview.value
+  if (!summary.drafts.length && !summary.invalidCount) {
+    toast('没有可解析的号码', 'info')
+    return
+  }
+  if (!summary.added) {
+    const head = []
+    if (summary.duplicates) head.push(`重复 ${summary.duplicates} 注`)
+    if (summary.invalidCount) head.push(`无效 ${summary.invalidCount} 行`)
+    const reason = summary.errors[0] ? `第 ${summary.errors[0].line} 行：${summary.errors[0].message}` : ''
+    toast([...head, reason].filter(Boolean).join('，') || '没有新号码', summary.invalidCount ? 'error' : 'info')
+    return
+  }
+  const result = addMany(summary.drafts)
+  const parts = [`已加入 ${result.added} 注`]
+  if (result.duplicates) parts.push(`重复 ${result.duplicates} 注`)
+  if (summary.invalidCount) parts.push(`无效 ${summary.invalidCount} 行`)
+  toast(parts.join('，'), summary.invalidCount ? 'info' : 'ok')
+  if (!summary.invalidCount) pasteText.value = ''
 }
 
 function addManual() {
