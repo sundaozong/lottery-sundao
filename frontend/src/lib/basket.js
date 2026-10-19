@@ -10,6 +10,7 @@ const SOURCE_LABELS = {
   analysis: '回声',
   form: '体检',
   expand: '复式胆拖',
+  replay: '回放',
 }
 
 const STRATEGY_LABELS = {

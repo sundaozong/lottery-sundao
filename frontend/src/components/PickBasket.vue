@@ -73,6 +73,7 @@
               <span class="predict-row-label">第 {{ index + 1 }} 注</span>
               <span class="text-xs text-muted">{{ sourceText(item) }} · {{ timeLabel(item.added_at) }}</span>
               <button class="btn btn-ghost btn-sm" type="button" @click="checkItem(item)">体检</button>
+              <button class="btn btn-ghost btn-sm" type="button" @click="replayItem(item)">回放</button>
               <button class="icon-btn danger" type="button" title="移出" aria-label="移出这注" @click="remove(item.id)">
                 <AppIcon name="trash" />
               </button>
@@ -183,6 +184,7 @@ import { useRouter } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
 import { useBasket } from '../composables/useBasket'
+import { useReplay } from '../composables/useReplay'
 import { confirmDialog, toast } from '../composables/feedback'
 import NumberBalls from './NumberBalls.vue'
 import NumberPad from './NumberPad.vue'
@@ -204,6 +206,7 @@ const {
   clearAll,
   dropIds,
 } = useBasket()
+const replay = useReplay()
 
 const router = useRouter()
 
@@ -260,6 +263,13 @@ function betsOf(item) {
 
 function costOf(item) {
   return lineCost(item.lottery_type, item.numbers, multiple.value)
+}
+
+function replayItem(item) {
+  replay.openTicket({
+    lotteryType: item.lottery_type,
+    numbers: item.numbers,
+  })
 }
 
 function checkItem(item) {

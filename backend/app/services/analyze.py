@@ -27,15 +27,12 @@ def _pool(lottery_type: str) -> tuple[list[str], list[str]]:
     return [], []
 
 
-def analyze(db: Session, lottery_type: str, limit: int = 50) -> dict:
+def analyze(db: Session, lottery_type: str, limit: int = 50, before_issue: str | None = None) -> dict:
     t = normalize_type(lottery_type)
-    rows = (
-        db.query(Draw)
-        .filter(Draw.lottery_type == t)
-        .order_by(Draw.issue.desc())
-        .limit(limit)
-        .all()
-    )
+    query = db.query(Draw).filter(Draw.lottery_type == t)
+    if before_issue is not None:
+        query = query.filter(Draw.issue < str(before_issue))
+    rows = query.order_by(Draw.issue.desc()).limit(limit).all()
     main_pool, spec_pool = _pool(t)
     main_cnt: Counter = Counter()
     spec_cnt: Counter = Counter()

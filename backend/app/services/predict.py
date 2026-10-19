@@ -521,6 +521,7 @@ def generate(
     count: int = 1,
     constraints=None,
     max_attempts: int = MAX_ATTEMPTS,
+    before_issue: str | None = None,
 ) -> dict:
     if (strategy or "").strip().lower() == "pulse":
         if constraints_requested(constraints):
@@ -529,7 +530,7 @@ def generate(
 
         return generate_pulse(db, lottery_type, count=count)
     t = normalize_type(lottery_type)
-    stats = analyze(db, t, limit=50)
+    stats = analyze(db, t, limit=50, before_issue=before_issue)
     main_freq = stats["main_freq"]
     spec_freq = stats["special_freq"]
     strategy = (strategy or "hot").lower()
