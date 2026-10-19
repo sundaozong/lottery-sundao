@@ -61,6 +61,63 @@
           <p class="form-hint">{{ collision.disclaimer }}</p>
         </div>
 
+        <section class="basket-coverage" aria-label="覆盖度">
+          <div class="card-title">覆盖度 <span class="sub">相对当前篮</span></div>
+          <template v-if="coverage.ticketCount">
+            <p class="basket-summary">{{ coverage.summary }}</p>
+            <div v-for="zone in coverageZones" :key="zone.key" class="basket-coverage-zone">
+              <div class="basket-coverage-label">{{ zone.label }} {{ zone.covered }}/{{ zone.poolSize }}</div>
+              <div class="basket-coverage-grid">
+                <button
+                  v-for="cell in zone.cells"
+                  :key="zone.key + cell.n"
+                  type="button"
+                  class="coverage-ball"
+                  :class="{ 'is-on': isFocus(zone.key, cell.n), 'is-hot': cell.hot }"
+                  :data-heat="cell.heat"
+                  :aria-pressed="isFocus(zone.key, cell.n)"
+                  :aria-label="ballLabel(zone, cell)"
+                  @click="toggleFocus(zone.key, cell.n)"
+                >
+                  <span class="coverage-num">{{ cell.n }}</span>
+                  <span v-if="cell.count" class="coverage-count">{{ cell.count }}</span>
+                </button>
+              </div>
+              <div v-if="zone.uncovered.length" class="basket-coverage-holes">
+                <div class="form-hint">{{ zone.label }}未覆盖</div>
+                <div class="basket-holes">
+                  <span v-for="n in holePreview(zone)" :key="zone.key + '-hole-' + n" class="ball ghost sm">{{ n }}</span>
+                </div>
+              </div>
+            </div>
+            <button v-if="holeOverflow" class="text-btn basket-coverage-more" type="button" @click="showAllHoles = !showAllHoles">
+              {{ showAllHoles ? '收起未覆盖' : '展开其余未覆盖' }}
+            </button>
+            <p v-if="focusCell" class="form-hint">正在看{{ focusLabel }} {{ focusCell.n }}，篮内 {{ focusIds.size }} 注。再点一次取消。</p>
+            <div class="basket-coverage-actions">
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="!canCopyHoles" @click="copyHoles">复制未覆盖</button>
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="!canCopyHoles" @click="writeKills">未覆盖写入杀号</button>
+              <button
+                class="btn btn-ghost btn-sm"
+                type="button"
+                :disabled="!hotCount && !markHot"
+                :aria-pressed="markHot"
+                @click="markHot = !markHot"
+              >{{ markHot ? '取消过热高亮' : '高亮过热注' }}</button>
+              <button
+                v-if="focusCell"
+                class="btn btn-ghost btn-sm"
+                type="button"
+                :disabled="!focusIds.size"
+                @click="removeFocused"
+              >移出含 {{ focusCell.n }} 的注</button>
+            </div>
+            <p class="form-hint">{{ coverage.rule }}</p>
+          </template>
+          <p v-else class="form-hint">当前彩种还没有注。</p>
+          <p class="form-hint">{{ coverage.disclaimer }}</p>
+        </section>
+
         <div v-if="!visible.length" class="empty">
           <div class="icon"><AppIcon name="inbox" :size="22" /></div>
           <div class="empty-title">这彩种还是空的</div>
@@ -68,7 +125,7 @@
         </div>
 
         <div v-else class="basket-list">
-          <div v-for="(item, index) in visible" :key="item.id" class="basket-item">
+          <div v-for="(item, index) in visible" :key="item.id" class="basket-item" :class="itemClass(item)">
             <div class="basket-item-top">
               <span class="predict-row-label">第 {{ index + 1 }} 注</span>
               <span class="text-xs text-muted">{{ sourceText(item) }} · {{ timeLabel(item.added_at) }}</span>
@@ -339,6 +396,14 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
+import {
+  CONSTRAINTS_UPDATED_EVENT,
+  basketCoverage,
+  coverageTicketIds,
+  formatUncoveredText,
+  hotTicketIds,
+  writeUncoveredKills,
+} from '../lib/basketCoverage'
 import { previewBasketPaste } from '../lib/basketPaste'
 import {
   BASKET_FILTER_DISCLAIMER,
@@ -411,8 +476,33 @@ let verifySeq = 0
 const manualMain = ref([])
 const manualSpecial = ref([])
 const manualPositions = ref([])
+const focusCell = ref(null)
+const markHot = ref(false)
+const showAllHoles = ref(false)
+const HOLE_PREVIEW = 12
 
 const profile = computed(() => basketProfile(viewType.value))
+const coverage = computed(() => basketCoverage(viewType.value, visible.value))
+const coverageZones = computed(() => [coverage.value.main, coverage.value.special].filter(Boolean))
+const holeOverflow = computed(() => coverageZones.value.some((zone) => zone.uncovered.length > HOLE_PREVIEW))
+const canCopyHoles = computed(() => (
+  coverage.value.ticketCount > 0 && coverageZones.value.some((zone) => zone.uncovered.length > 0)
+))
+const hotCount = computed(() => coverageZones.value.reduce((sum, zone) => sum + zone.hot.length, 0))
+const focusIds = computed(() => {
+  if (!focusCell.value) return null
+  return new Set(coverageTicketIds(
+    viewType.value,
+    visible.value,
+    focusCell.value.zone,
+    focusCell.value.n,
+  ))
+})
+const hotIds = computed(() => new Set(hotTicketIds(viewType.value, visible.value, coverage.value)))
+const focusLabel = computed(() => {
+  if (!focusCell.value) return ''
+  return coverageZones.value.find((zone) => zone.key === focusCell.value.zone)?.label || ''
+})
 const typeName = computed(() => TYPE_NAMES[viewType.value] || viewType.value)
 const mainColor = computed(() => ballClass(viewType.value, 'main'))
 const previewCost = computed(() => visible.value.reduce(
@@ -627,15 +717,47 @@ function addManual() {
   if (result.status === 'added') resetManual()
 }
 
-async function copyAll() {
-  const text = formatBasketText(visible.value, viewType.value)
-  if (!text) {
-    toast('当前彩种篮是空的', 'info')
+function holePreview(zone) {
+  if (showAllHoles.value) return zone.uncovered
+  return zone.uncovered.slice(0, HOLE_PREVIEW)
+}
+
+function isFocus(zone, n) {
+  return focusCell.value?.zone === zone && focusCell.value?.n === n
+}
+
+function toggleFocus(zone, n) {
+  if (isFocus(zone, n)) {
+    focusCell.value = null
     return
   }
+  focusCell.value = { zone, n }
+}
+
+function ballLabel(zone, cell) {
+  if (!cell.count) return `${zone.label} ${cell.n}，未覆盖`
+  return `${zone.label} ${cell.n}，出现 ${cell.count} 次${cell.hot ? '，过热' : ''}`
+}
+
+function itemClass(item) {
+  const focused = focusIds.value
+  return {
+    'is-focus': Boolean(focused && focused.has(item.id)),
+    'is-dim': Boolean(focused && !focused.has(item.id)),
+    'is-hot': markHot.value && hotIds.value.has(item.id),
+  }
+}
+
+function resetCoverageView() {
+  focusCell.value = null
+  markHot.value = false
+  showAllHoles.value = false
+}
+
+async function copyText(text, okMessage) {
   try {
     await navigator.clipboard.writeText(text)
-    toast('已复制号码', 'ok')
+    toast(okMessage, 'ok')
     return
   } catch {
     /* 浏览器拦住剪贴板时，退回选中文本复制 */
@@ -650,10 +772,57 @@ async function copyAll() {
     area.select()
     const copied = document.execCommand('copy')
     area.remove()
-    toast(copied ? '已复制号码' : '复制失败，请检查浏览器权限', copied ? 'ok' : 'error')
+    toast(copied ? okMessage : '复制失败，请检查浏览器权限', copied ? 'ok' : 'error')
   } catch {
     toast('复制失败，请检查浏览器权限', 'error')
   }
+}
+
+async function copyAll() {
+  const text = formatBasketText(visible.value, viewType.value)
+  if (!text) {
+    toast('当前彩种篮是空的', 'info')
+    return
+  }
+  await copyText(text, '已复制号码')
+}
+
+async function copyHoles() {
+  const text = formatUncoveredText(coverage.value)
+  if (!canCopyHoles.value || !text) {
+    toast(coverage.value.ticketCount ? '号码池已经铺满' : '当前彩种还没有注', 'info')
+    return
+  }
+  await copyText(text, '已复制未覆盖号')
+}
+
+function writeKills() {
+  const result = writeUncoveredKills(localStorage, viewType.value, coverage.value)
+  if (result.status === 'written') {
+    window.dispatchEvent(new CustomEvent(CONSTRAINTS_UPDATED_EVENT, {
+      detail: { lotteryType: viewType.value },
+    }))
+  }
+  const kind = result.status === 'written' ? 'ok' : 'info'
+  toast(result.message, kind)
+}
+
+async function removeFocused() {
+  if (!focusCell.value || !focusIds.value?.size) {
+    toast('没有含这个号的注', 'info')
+    return
+  }
+  const ids = [...focusIds.value]
+  const label = `${focusLabel.value} ${focusCell.value.n}`.trim()
+  const ok = await confirmDialog({
+    title: '移出相关注',
+    message: `从选号篮拿掉含 ${label} 的 ${ids.length} 注？其他注还留着。`,
+    confirmText: '移出',
+  })
+  if (!ok) return
+  dropIds(ids)
+  focusCell.value = null
+  toast(`已移出 ${ids.length} 注`, 'ok')
 }
 
 async function onClearType() {
@@ -709,6 +878,7 @@ function onKey(event) {
 
 watch(viewType, () => {
   resetManual()
+  resetCoverageView()
   filterForm.value = emptyBasketFilter()
   verifyResult.value = null
   verifyError.value = ''
