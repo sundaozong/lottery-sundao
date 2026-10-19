@@ -61,6 +61,47 @@
           <p class="form-hint">{{ collision.disclaimer }}</p>
         </div>
 
+        <section class="basket-prune" aria-label="相似度修剪">
+          <button class="btn btn-ghost btn-sm" type="button" @click="showPrune = !showPrune">
+            {{ showPrune ? '收起相似度修剪' : '相似度修剪' }}
+          </button>
+          <template v-if="showPrune">
+            <p class="form-hint">按主号两两重合找出近重复，留下更分散的子集。特别号只显示，不参与修剪。</p>
+            <div class="basket-prune-threshold">
+              <label class="form-label" for="basket-prune-threshold">重合不少于</label>
+              <input
+                id="basket-prune-threshold"
+                v-model="pruneThresholdInput"
+                class="form-input"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                :max="pruneMax"
+                :placeholder="String(pruneDefault)"
+              />
+              <button class="btn btn-ghost btn-sm" type="button" @click="usePruneDefault">默认 {{ pruneDefault }}</button>
+              <button v-if="pruneStrict" class="btn btn-ghost btn-sm" type="button" @click="usePruneStrict">完全相同</button>
+            </div>
+            <p class="basket-paste-summary">{{ prunePreview.summary.text }}</p>
+            <ul v-if="pruneDrops.length" class="basket-filter-drops">
+              <li v-for="row in pruneDrops" :key="row.id">
+                第 {{ row.index }} 注 · {{ row.label }} · 最高重合 {{ row.maxOverlap }}
+              </li>
+            </ul>
+            <p v-if="prunePreview.remove.length > pruneDrops.length" class="form-hint">其余将移出的注已省略</p>
+            <div class="basket-filter-actions">
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="count < 2" @click="previewPrune">预览</button>
+              <button
+                class="btn btn-primary btn-sm"
+                type="button"
+                :disabled="count < 2 || !prunePreview.removeIds.length"
+                @click="applyPrune"
+              >移出近重复</button>
+            </div>
+            <p class="form-hint">{{ pruneDisclaimer }}</p>
+          </template>
+        </section>
+
         <section class="basket-coverage" aria-label="覆盖度">
           <div class="card-title">覆盖度 <span class="sub">相对当前篮</span></div>
           <template v-if="coverage.ticketCount">
@@ -487,6 +528,11 @@ import {
 } from '../lib/basketCoverage'
 import { previewBasketPaste } from '../lib/basketPaste'
 import {
+  BASKET_PRUNE_DISCLAIMER,
+  defaultPruneThreshold,
+  previewBasketPrune,
+} from '../lib/basketPrune'
+import {
   BASKET_FILTER_DISCLAIMER,
   emptyBasketFilter,
   filterFromBands,
@@ -538,6 +584,9 @@ const showManual = ref(false)
 const showPaste = ref(false)
 const pasteText = ref('')
 const showFilter = ref(false)
+const showPrune = ref(false)
+const pruneThresholdInput = ref('')
+const pruneDisclaimer = BASKET_PRUNE_DISCLAIMER
 const showSnapshots = ref(false)
 const snapshotList = ref([])
 const snapshotName = ref('')
@@ -604,6 +653,12 @@ const previewCost = computed(() => visible.value.reduce(
 const pastePreview = computed(() => previewBasketPaste(visible.value, viewType.value, pasteText.value))
 const filterPreview = computed(() => previewBasketFilter(visible.value, viewType.value, filterForm.value))
 const filterDrops = computed(() => filterPreview.value.drop.slice(0, 8))
+const pruneDefault = computed(() => defaultPruneThreshold(profile.value))
+const pruneMax = computed(() => profile.value?.mainCount || profile.value?.mainMax || 20)
+const pruneStrict = computed(() => profile.value?.mainCount || 0)
+const prunePreview = computed(() => previewBasketPrune(visible.value, viewType.value, pruneThresholdInput.value))
+const pruneDrops = computed(() => prunePreview.value.remove.slice(0, 8))
+const pruneRemoveIds = computed(() => new Set(prunePreview.value.removeIds))
 const pasteActive = computed(() => pastePreview.value.drafts.length > 0 || pastePreview.value.invalidCount > 0)
 const verifyMultiple = computed(() => Math.max(1, Math.floor(Number(multiple.value) || 1)))
 const pastePlaceholder = computed(() => {
@@ -937,7 +992,38 @@ function itemClass(item) {
     'is-focus': Boolean(focused && focused.has(item.id)),
     'is-dim': Boolean(focused && !focused.has(item.id)),
     'is-hot': markHot.value && hotIds.value.has(item.id),
+    'is-prune': showPrune.value && pruneRemoveIds.value.has(item.id),
   }
+}
+
+function usePruneDefault() {
+  pruneThresholdInput.value = ''
+}
+
+function usePruneStrict() {
+  if (!pruneStrict.value) return
+  pruneThresholdInput.value = String(pruneStrict.value)
+}
+
+function previewPrune() {
+  if (count.value < 2) return
+  const preview = prunePreview.value
+  toast(preview.summary.text, preview.removeIds.length ? 'info' : 'ok')
+}
+
+async function applyPrune() {
+  const preview = prunePreview.value
+  if (preview.summary.total < 2 || !preview.removeIds.length) return
+  const ok = await confirmDialog({
+    title: '移出近重复',
+    message: `当前${typeName.value}将保留 ${preview.summary.keep} 注，移出 ${preview.summary.remove} 注。其他彩种不动。`,
+    confirmText: '移出',
+  })
+  if (!ok) return
+  const removed = preview.removeIds.length
+  const kept = preview.summary.keep
+  dropIds(preview.removeIds)
+  toast(`已移出 ${removed} 注，留下 ${kept} 注`, 'ok')
 }
 
 function resetCoverageView() {
@@ -1072,6 +1158,7 @@ watch(viewType, () => {
   resetManual()
   resetCoverageView()
   filterForm.value = emptyBasketFilter()
+  pruneThresholdInput.value = ''
   verifyResult.value = null
   verifyError.value = ''
   verifyIssue.value = ''
