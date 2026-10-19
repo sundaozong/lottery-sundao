@@ -1363,12 +1363,34 @@ button.ball {
   margin-bottom: 8px;
 }
 .basket-item-top .text-xs { margin-right: auto; }
+.basket-paste,
 .basket-manual {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+.basket-paste .btn,
 .basket-manual .btn { margin-bottom: 10px; }
+.basket-paste-input {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.basket-paste-input::placeholder { color: var(--text-muted); }
+.basket-paste-summary {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.basket-paste-errors {
+  margin: 6px 0 0;
+  padding-left: 1.1em;
+  color: var(--danger);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
 .basket-check {
   display: flex;
   align-items: center;
