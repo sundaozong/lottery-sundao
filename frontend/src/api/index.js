@@ -201,6 +201,7 @@ export const api = {
   },
   records: () => request('/api/records'),
   verifyRecords: (body = {}) => request('/api/records/verify', { method: 'POST', body: JSON.stringify(body) }),
+  basketVerify: (body) => request('/api/basket/verify', { method: 'POST', body: JSON.stringify(body) }),
   recordMonths: () => request('/api/records/monthly'),
   rhythm: () => request('/api/records/rhythm'),
   createRecord: (body) => request('/api/records', { method: 'POST', body: JSON.stringify(body) }),

@@ -84,6 +84,80 @@
           </div>
         </div>
 
+        <div class="basket-verify">
+          <button class="btn btn-ghost btn-sm" type="button" @click="toggleVerify">
+            {{ showVerify ? '收起对照开奖' : '对照开奖' }}
+          </button>
+          <template v-if="showVerify">
+            <p class="form-hint">对照本地已有开奖，只看示意结果，不会写入购彩记录。</p>
+            <div class="basket-verify-row">
+              <div class="form-group">
+                <label class="form-label" for="basket-verify-issue">期号</label>
+                <input
+                  id="basket-verify-issue"
+                  v-model="verifyIssue"
+                  class="form-input"
+                  list="basket-verify-issues"
+                  placeholder="留空则用最新一期"
+                />
+                <datalist id="basket-verify-issues">
+                  <option v-for="row in verifyIssues" :key="row.issue" :value="row.issue">{{ row.draw_date }}</option>
+                </datalist>
+              </div>
+              <button class="btn btn-primary btn-sm" type="button" :disabled="!count || verifying" @click="runVerify">
+                {{ verifying ? '核对中…' : '核对' }}
+              </button>
+            </div>
+            <p class="form-hint">倍数用篮底的 {{ verifyMultiple }} 倍。改倍数后请再点一次核对。</p>
+            <p v-if="!count" class="form-hint">当前彩种篮是空的，先放进号码再核对。</p>
+            <p v-if="verifyError" class="basket-verify-error">{{ verifyError }}</p>
+            <template v-if="verifyResult">
+              <p v-if="verifyResult.message" class="form-hint">{{ verifyResult.message }}</p>
+              <div v-if="verifyResult.draw_numbers" class="basket-verify-draw">
+                <div class="form-hint">第 {{ verifyResult.issue }} 期开奖<span v-if="verifyResult.draw_date"> · {{ verifyResult.draw_date }}</span></div>
+                <NumberBalls :numbers="verifyResult.draw_numbers" :type="viewType" size="sm" />
+              </div>
+              <div class="basket-verify-stats">
+                <div>
+                  <span>核对</span>
+                  <strong>{{ verifyResult.summary.total }} 注</strong>
+                </div>
+                <div>
+                  <span>示意中奖</span>
+                  <strong>{{ verifyResult.summary.win_count }} 注</strong>
+                </div>
+                <div>
+                  <span>示意奖金</span>
+                  <strong>{{ formatMoney(verifyResult.summary.illustrative_amount) }}</strong>
+                </div>
+                <div>
+                  <span>成本</span>
+                  <strong>{{ formatMoney(verifyResult.summary.cost) }}</strong>
+                </div>
+                <div class="wide">
+                  <span>示意盈亏</span>
+                  <strong :class="netClass(verifyResult.summary.net)">{{ formatSignedMoney(verifyResult.summary.net) }}</strong>
+                </div>
+              </div>
+              <div v-for="(row, index) in verifyResult.items" :key="row.id || index" class="basket-verify-item">
+                <div class="basket-item-top">
+                  <span class="predict-row-label">第 {{ index + 1 }} 注</span>
+                  <span class="text-xs text-muted">{{ verifyStatusText(row) }}<template v-if="row.status === 'ok'"> · 主号 {{ row.main_hit }} · 特别号 {{ row.special_hit }}</template></span>
+                  <strong class="basket-verify-amount" :class="{ ok: isIllustrativeWin(row) }">{{ formatMoney(row.amount) }}</strong>
+                </div>
+                <NumberBalls
+                  :numbers="hitOf(row)?.numbers || row.numbers"
+                  :type="viewType"
+                  :marks="row.status === 'ok' ? hitOf(row)?.marks : null"
+                  size="sm"
+                />
+                <p v-if="row.bets > 1" class="form-hint">复式 {{ row.bets }} 注 · {{ row.play_name }}</p>
+              </div>
+              <p class="form-hint">{{ verifyResult.disclaimer }}</p>
+            </template>
+          </template>
+        </div>
+
         <div class="basket-paste">
           <button class="btn btn-ghost btn-sm" type="button" @click="showPaste = !showPaste">
             {{ showPaste ? '收起粘贴导入' : '粘贴导入' }}
@@ -210,6 +284,15 @@ import { useRouter } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
 import { previewBasketPaste } from '../lib/basketPaste'
+import {
+  betHitView,
+  formatMoney,
+  formatSignedMoney,
+  isIllustrativeWin,
+  netClass,
+  ticketsFromBasket,
+  verifyStatusText,
+} from '../lib/basketVerify'
 import { useBasket } from '../composables/useBasket'
 import { useReplay } from '../composables/useReplay'
 import { confirmDialog, toast } from '../composables/feedback'
@@ -245,6 +328,13 @@ const saving = ref(false)
 const showManual = ref(false)
 const showPaste = ref(false)
 const pasteText = ref('')
+const showVerify = ref(false)
+const verifyIssue = ref('')
+const verifyIssues = ref([])
+const verifyResult = ref(null)
+const verifyError = ref('')
+const verifying = ref(false)
+let verifySeq = 0
 const manualMain = ref([])
 const manualSpecial = ref([])
 const manualPositions = ref([])
@@ -258,6 +348,7 @@ const previewCost = computed(() => visible.value.reduce(
 ))
 const pastePreview = computed(() => previewBasketPaste(visible.value, viewType.value, pasteText.value))
 const pasteActive = computed(() => pastePreview.value.drafts.length > 0 || pastePreview.value.invalidCount > 0)
+const verifyMultiple = computed(() => Math.max(1, Math.floor(Number(multiple.value) || 1)))
 const pastePlaceholder = computed(() => {
   const spec = profile.value
   if (!spec) return ''
@@ -308,6 +399,58 @@ function betsOf(item) {
 
 function costOf(item) {
   return lineCost(item.lottery_type, item.numbers, multiple.value)
+}
+
+function hitOf(row) {
+  if (row?.status !== 'ok' || !verifyResult.value?.draw_numbers) return null
+  return betHitView(viewType.value, row.numbers, verifyResult.value.draw_numbers)
+}
+
+async function loadVerifyIssues() {
+  try {
+    const data = await api.draws(viewType.value, 40)
+    verifyIssues.value = data.items || []
+    if (!String(verifyIssue.value || '').trim() && verifyIssues.value[0]?.issue) {
+      verifyIssue.value = verifyIssues.value[0].issue
+    }
+  } catch {
+    verifyIssues.value = []
+  }
+}
+
+async function toggleVerify() {
+  showVerify.value = !showVerify.value
+  if (showVerify.value) await loadVerifyIssues()
+}
+
+async function runVerify() {
+  if (!visible.value.length) {
+    verifyResult.value = null
+    verifyError.value = '当前彩种篮是空的。'
+    return
+  }
+  if (verifying.value) return
+  const seq = ++verifySeq
+  verifying.value = true
+  verifyError.value = ''
+  try {
+    const times = verifyMultiple.value
+    const body = await api.basketVerify({
+      lottery_type: viewType.value,
+      issue: String(verifyIssue.value || '').trim(),
+      multiple: times,
+      tickets: ticketsFromBasket(visible.value, times),
+    })
+    if (seq !== verifySeq) return
+    verifyResult.value = body
+    if (body.issue) verifyIssue.value = body.issue
+  } catch (err) {
+    if (seq !== verifySeq) return
+    verifyResult.value = null
+    verifyError.value = err?.message || '核对失败'
+  } finally {
+    if (seq === verifySeq) verifying.value = false
+  }
 }
 
 function replayItem(item) {
@@ -453,6 +596,18 @@ function onKey(event) {
 
 watch(viewType, () => {
   resetManual()
+  verifyResult.value = null
+  verifyError.value = ''
+  verifyIssue.value = ''
+  verifyIssues.value = []
+  if (showVerify.value) loadVerifyIssues()
+})
+
+watch(() => visible.value.map((item) => item.id).join('|'), () => {
+  verifySeq += 1
+  verifyResult.value = null
+  verifyError.value = ''
+  verifying.value = false
 })
 
 watch(isOpen, (open) => {

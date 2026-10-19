@@ -11,7 +11,7 @@ from .services.seed import ensure_seed
 from .services.crawl import run_crawl
 from .models import AppSetting
 from .config import get_settings
-from .routers import draws, analysis, predict, records, prize, settings_mail, bet_expand, replay
+from .routers import draws, analysis, predict, records, prize, settings_mail, bet_expand, replay, basket
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("yysg")
@@ -75,6 +75,7 @@ app.include_router(records.router)
 app.include_router(prize.router)
 app.include_router(bet_expand.router)
 app.include_router(replay.router)
+app.include_router(basket.router)
 app.include_router(settings_mail.router)
 
 
