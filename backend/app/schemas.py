@@ -47,6 +47,21 @@ class RecordVerifyIn(BaseModel):
     record_ids: Optional[list[int]] = None
 
 
+class BasketTicketIn(BaseModel):
+    id: Optional[str] = None
+    numbers: Any = None
+    play: Optional[str] = None
+    pick: Optional[int] = None
+
+
+class BasketVerifyIn(BaseModel):
+    """选号篮对照某一期开奖。只读，不写购彩记录。"""
+    lottery_type: str
+    issue: str = ""
+    tickets: list[BasketTicketIn] = Field(default_factory=list)
+    multiple: int = 1
+
+
 class PrizeCalcIn(BaseModel):
     lottery_type: str
     bet_numbers: Any

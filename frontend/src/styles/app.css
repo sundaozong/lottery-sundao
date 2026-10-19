@@ -1433,6 +1433,66 @@ button.ball {
   gap: 8px;
 }
 .basket-actions .btn-primary { margin-left: auto; }
+.basket-verify {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.basket-verify > .btn { margin-bottom: 10px; }
+.basket-verify-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.basket-verify-row .form-group { flex: 1; margin-bottom: 0; }
+.basket-verify-row > .btn { flex: none; margin-bottom: 1px; }
+.basket-verify-error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+.basket-verify-draw { margin-top: 10px; }
+.basket-verify-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0;
+}
+.basket-verify-stats > div {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+.basket-verify-stats .wide { grid-column: 1 / -1; }
+.basket-verify-stats span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.basket-verify-stats strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.basket-verify-stats strong.ok,
+.basket-verify-amount.ok { color: var(--success); }
+.basket-verify-stats strong.down { color: var(--danger); }
+.basket-verify-item {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+.basket-verify-item .basket-item-top { flex-wrap: wrap; }
+.basket-verify-amount {
+  margin-left: auto;
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
 .chip:disabled { opacity: 0.45; cursor: not-allowed; }
 .expand-zone { margin-top: 14px; }
 .expand-zone-grid {
