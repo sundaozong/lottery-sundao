@@ -1433,10 +1433,46 @@ button.ball {
   gap: 8px;
 }
 .basket-actions .btn-primary { margin-left: auto; }
+.basket-filter,
 .basket-verify {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+.basket-filter > .btn { margin-bottom: 10px; }
+.basket-filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+.basket-filter-grid .form-group { margin-bottom: 0; }
+.basket-filter-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.basket-filter-range .form-input {
+  min-width: 0;
+  padding: 7px 8px;
+}
+.basket-filter-range > span { color: var(--text-muted); }
+.basket-filter-drops {
+  margin: 6px 0 0;
+  padding-left: 1.1em;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.basket-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.basket-filter-actions .btn { margin-bottom: 0; }
+@media (max-width: 420px) {
+  .basket-filter-grid { grid-template-columns: 1fr; }
 }
 .basket-verify > .btn { margin-bottom: 10px; }
 .basket-verify-row {

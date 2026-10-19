@@ -84,6 +84,62 @@
           </div>
         </div>
 
+        <div class="basket-filter">
+          <button class="btn btn-ghost btn-sm" type="button" @click="showFilter = !showFilter">
+            {{ showFilter ? '收起条件过滤' : '条件过滤' }}
+          </button>
+          <template v-if="showFilter">
+            <p class="form-hint">只滤当前彩种的主号形态。特别号不并进。只填下限或上限时，另一边不限制。</p>
+            <div class="basket-filter-grid">
+              <div v-for="field in filterFields" :key="field.key" class="form-group">
+                <label class="form-label" :for="`basket-filter-${field.key}-min`">{{ field.label }}</label>
+                <div class="basket-filter-range">
+                  <input
+                    :id="`basket-filter-${field.key}-min`"
+                    v-model="filterForm[`${field.key}Min`]"
+                    class="form-input"
+                    type="number"
+                    inputmode="numeric"
+                    :placeholder="field.min"
+                    :aria-label="`${field.label}下限`"
+                  />
+                  <span aria-hidden="true">–</span>
+                  <input
+                    :id="`basket-filter-${field.key}-max`"
+                    v-model="filterForm[`${field.key}Max`]"
+                    class="form-input"
+                    type="number"
+                    inputmode="numeric"
+                    :placeholder="field.max"
+                    :aria-label="`${field.label}上限`"
+                  />
+                </div>
+              </div>
+            </div>
+            <p class="basket-paste-summary">{{ filterPreview.summary.text }}</p>
+            <ul v-if="filterDrops.length" class="basket-filter-drops">
+              <li v-for="row in filterDrops" :key="row.id">
+                {{ row.label }}
+                <template v-if="row.metrics"> · 和值 {{ row.metrics.sum }} · 跨度 {{ row.metrics.span }} · 奇数 {{ row.metrics.odd }}</template>
+              </li>
+            </ul>
+            <p v-if="filterPreview.drop.length > filterDrops.length" class="form-hint">其余将剔除的注已省略</p>
+            <div class="basket-filter-actions">
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="fillingBands" @click="fillCommonBands">
+                {{ fillingBands ? '读取中…' : '填入常见带' }}
+              </button>
+              <button class="btn btn-ghost btn-sm" type="button" @click="clearFilter">清空条件</button>
+              <button
+                class="btn btn-primary btn-sm"
+                type="button"
+                :disabled="!filterPreview.summary.active || !filterPreview.dropIds.length"
+                @click="removeMismatch"
+              >移出不符</button>
+            </div>
+            <p class="form-hint">{{ filterDisclaimer }}</p>
+          </template>
+        </div>
+
         <div class="basket-verify">
           <button class="btn btn-ghost btn-sm" type="button" @click="toggleVerify">
             {{ showVerify ? '收起对照开奖' : '对照开奖' }}
@@ -285,6 +341,12 @@ import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
 import { previewBasketPaste } from '../lib/basketPaste'
 import {
+  BASKET_FILTER_DISCLAIMER,
+  emptyBasketFilter,
+  filterFromBands,
+  previewBasketFilter,
+} from '../lib/basketFilter'
+import {
   betHitView,
   formatMoney,
   formatSignedMoney,
@@ -328,6 +390,17 @@ const saving = ref(false)
 const showManual = ref(false)
 const showPaste = ref(false)
 const pasteText = ref('')
+const showFilter = ref(false)
+const filterForm = ref(emptyBasketFilter())
+const fillingBands = ref(false)
+const filterFields = [
+  { key: 'sum', label: '和值', min: '最低', max: '最高' },
+  { key: 'span', label: '跨度', min: '最小', max: '最大' },
+  { key: 'odd', label: '奇数个数', min: '最少', max: '最多' },
+  { key: 'hewei', label: '和尾', min: '最低', max: '最高' },
+  { key: 'ac', label: 'AC', min: '最低', max: '最高' },
+]
+const filterDisclaimer = BASKET_FILTER_DISCLAIMER
 const showVerify = ref(false)
 const verifyIssue = ref('')
 const verifyIssues = ref([])
@@ -347,6 +420,8 @@ const previewCost = computed(() => visible.value.reduce(
   0,
 ))
 const pastePreview = computed(() => previewBasketPaste(visible.value, viewType.value, pasteText.value))
+const filterPreview = computed(() => previewBasketFilter(visible.value, viewType.value, filterForm.value))
+const filterDrops = computed(() => filterPreview.value.drop.slice(0, 8))
 const pasteActive = computed(() => pastePreview.value.drafts.length > 0 || pastePreview.value.invalidCount > 0)
 const verifyMultiple = computed(() => Math.max(1, Math.floor(Number(multiple.value) || 1)))
 const pastePlaceholder = computed(() => {
@@ -470,6 +545,44 @@ function checkItem(item) {
       special: (item.numbers?.special || []).join(','),
     },
   })
+}
+
+function clearFilter() {
+  filterForm.value = emptyBasketFilter()
+}
+
+async function fillCommonBands() {
+  if (fillingBands.value) return
+  fillingBands.value = true
+  try {
+    const data = await api.betExpandBands(viewType.value)
+    const next = filterFromBands(data?.bands)
+    if (!data?.ready || !Object.keys(next).length) {
+      toast('还没有历史可对照，常见带没填上', 'info')
+      return
+    }
+    filterForm.value = { ...filterForm.value, ...next }
+    toast('已填入和值、跨度、奇数的常见带', 'ok')
+  } catch (err) {
+    toast(err?.message || '常见带读取失败', 'error')
+  } finally {
+    fillingBands.value = false
+  }
+}
+
+function removeMismatch() {
+  const preview = filterPreview.value
+  if (!preview.summary.active) {
+    toast('还没设条件，不会移出', 'info')
+    return
+  }
+  if (!preview.dropIds.length) {
+    toast('没有不符的注', 'info')
+    return
+  }
+  const removed = preview.dropIds.length
+  dropIds(preview.dropIds)
+  toast(`已移出 ${removed} 注`, 'ok')
 }
 
 function confirmPaste() {
@@ -596,6 +709,7 @@ function onKey(event) {
 
 watch(viewType, () => {
   resetManual()
+  filterForm.value = emptyBasketFilter()
   verifyResult.value = null
   verifyError.value = ''
   verifyIssue.value = ''

@@ -188,6 +188,8 @@ export const api = {
     return request(`/api/analysis/${type}/omit-board?${params}`)
   },
   betExpandRules: () => request('/api/bet-expand/rules'),
+  betExpandBands: (type, limit = 80) =>
+    request(`/api/bet-expand/bands?${new URLSearchParams({ lottery_type: type, limit: String(limit) })}`),
   betExpand: (body) => request('/api/bet-expand', { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => {
     const payload = {
