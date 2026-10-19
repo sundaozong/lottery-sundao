@@ -62,8 +62,14 @@
 
         <div class="card mb-4">
           <div class="card-title">
-            机选条件
-            <span class="sub">{{ strategy === 'pulse' ? '脉动综合不套用' : '留空则按策略抽样' }}</span>
+            <span>机选条件 <span class="sub">{{ strategy === 'pulse' ? '脉动综合不套用' : '留空则按策略抽样' }}</span></span>
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              :disabled="strategy === 'pulse'"
+              :title="strategy === 'pulse' ? '脉动综合不参与回放' : '用当前条件和策略回放历史'"
+              @click="openConstraintReplay"
+            >回放</button>
           </div>
           <p v-if="strategy === 'pulse'" class="strategy-desc">脉动综合仍按现有打分排序。机选条件只用于热号、冷号、混合和随机。</p>
           <template v-else>
@@ -317,7 +323,10 @@
           <div v-if="formReport" class="form-check-body">
             <div class="form-check-head">
               <div class="form-check-glance">{{ formReport.glance }}</div>
-              <span class="text-xs text-muted">样本 {{ formReport.sample_size }} 期</span>
+              <div class="form-check-actions">
+                <span class="text-xs text-muted">样本 {{ formReport.sample_size }} 期</span>
+                <button class="btn btn-ghost btn-sm" type="button" @click="replayChecked">回放</button>
+              </div>
             </div>
             <div class="form-check-list">
               <div v-for="item in formReport.metrics" :key="item.key" class="form-check-row">
@@ -386,8 +395,10 @@ import AppIcon from '../components/AppIcon.vue'
 import { toast } from '../composables/feedback'
 import { useBasket } from '../composables/useBasket'
 import { bandText, meterLayout, stanceClass, tokenize } from '../lib/formCheck'
+import { useReplay } from '../composables/useReplay'
 
 const basket = useBasket()
+const replay = useReplay()
 const route = useRoute()
 const router = useRouter()
 
@@ -677,6 +688,31 @@ function checkRec(rec) {
   formSpecial.value = (rec.special || []).join(' ')
   runFormCheck().then(() => {
     document.getElementById('form-check')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function openConstraintReplay() {
+  if (strategy.value === 'pulse') return
+  let filters = {}
+  try {
+    filters = buildConstraints()
+  } catch (err) {
+    toast(err.message, 'error')
+    return
+  }
+  replay.openStrategy({
+    lotteryType: lotteryType.value,
+    strategy: strategy.value,
+    constraints: filters,
+  })
+}
+
+function replayChecked() {
+  const report = formReport.value
+  if (!report) return
+  replay.openTicket({
+    lotteryType: report.lottery_type,
+    numbers: { main: report.query.main, special: report.query.special },
   })
 }
 

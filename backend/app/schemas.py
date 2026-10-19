@@ -676,6 +676,24 @@ class PredictIn(BaseModel):
     )
 
 
+class ReplayTicketIn(BaseModel):
+    lottery_type: str
+    bet_numbers: Any
+    multiple: int = Field(default=1, ge=1, le=99)
+    play: Optional[str] = None
+    pick: Optional[int] = None
+    window: Any = 30
+
+
+class ReplayStrategyIn(BaseModel):
+    lottery_type: str
+    strategy: str = "hot"
+    constraints: Optional[PredictConstraints] = None
+    tickets: int = Field(default=1, ge=1, le=5)
+    window: Any = 30
+    seed: Optional[int] = None
+
+
 class SettingsOut(BaseModel):
     crawl_interval_minutes: int = 60
     subscribed_types: list[str] = []

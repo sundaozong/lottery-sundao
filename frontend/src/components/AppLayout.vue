@@ -63,6 +63,7 @@
     </nav>
 
     <PickBasket />
+    <ReplayDrawer />
     <AppFeedback />
   </div>
 </template>
@@ -73,6 +74,7 @@ import { api } from '../api'
 import AppIcon from './AppIcon.vue'
 import AppFeedback from './AppFeedback.vue'
 import PickBasket from './PickBasket.vue'
+import ReplayDrawer from './ReplayDrawer.vue'
 import { toast } from '../composables/feedback'
 import { useBasket } from '../composables/useBasket'
 
