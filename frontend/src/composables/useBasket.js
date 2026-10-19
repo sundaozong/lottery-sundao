@@ -10,6 +10,7 @@ import {
   removeFromBasket,
   saveBasket,
 } from '../lib/basket'
+import { applySnapshot } from '../lib/basketSnapshots'
 
 const VIEW_KEY = 'yysg.pick.basket.view'
 
@@ -83,6 +84,15 @@ export function useBasket() {
     persist()
   }
 
+  function installSnapshot(snapshot) {
+    const result = applySnapshot(state.items, snapshot)
+    if (result.ok) {
+      state.items = result.items
+      persist()
+    }
+    return result
+  }
+
   return {
     visible: computed(() => itemsForLottery(state.items, state.viewType)),
     viewType: computed(() => state.viewType),
@@ -108,5 +118,6 @@ export function useBasket() {
     clearCurrent,
     clearAll,
     dropIds,
+    installSnapshot,
   }
 }
