@@ -9,6 +9,7 @@ const SOURCE_LABELS = {
   manual: '手选',
   analysis: '回声',
   form: '体检',
+  expand: '复式胆拖',
 }
 
 const STRATEGY_LABELS = {

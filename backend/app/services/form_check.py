@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from ..lotteries import parse_numbers
+from ..lotteries import normalize_type, parse_numbers
 from ..models import Draw
 from .ac import _ac_of
 from .echo import PROFILES, normalize_query
@@ -295,6 +295,41 @@ def _collect(draws: list[dict], profile: dict, field: str, special: bool) -> dic
             if value is not None:
                 histories[key].append(value)
     return histories
+
+
+def center_bands(db: Session, lottery_type: str, limit: int = 80) -> dict:
+    """主号和值、跨度、奇数个数的 p25–p75，算法与一注体检的常见带相同。"""
+    lottery = normalize_type(lottery_type)
+    if lottery not in PROFILES:
+        raise ValueError("未知彩种")
+    profile = PROFILES[lottery]
+    limit_n = _limit_of(limit)
+    draws, status = _load(db, lottery, profile, limit_n)
+    histories = _collect(draws, profile, "main", special=False)
+    bands: dict[str, dict] = {}
+    ready = True
+    for key, label in (("sum", "和值"), ("span", "跨度"), ("odd", "奇数")):
+        series = [item for item in histories.get(key, []) if item is not None]
+        if not series:
+            ready = False
+            break
+        low = _as_number(_quantile(series, 0.25))
+        high = _as_number(_quantile(series, 0.75))
+        bands[key] = {
+            "low": low,
+            "high": high,
+            "label": label,
+            "band_label": _fmt(low) if low == high else f"{_fmt(low)}–{_fmt(high)}",
+        }
+    return {
+        "lottery_type": lottery,
+        "sample_size": len(draws),
+        "limit": limit_n,
+        "ready": ready,
+        "bands": bands if ready else {},
+        "data_status": status,
+        "disclaimer": DISCLAIMER,
+    }
 
 
 def check_form(db: Session, lottery_type: str, main, special=None, limit: int = 80) -> dict:

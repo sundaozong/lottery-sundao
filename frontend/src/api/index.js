@@ -183,6 +183,8 @@ export const api = {
   },
   zhongweiScore: (type, body) => request(`/api/analysis/${type}/zhongwei/score`, { method: 'POST', body: JSON.stringify(body) }),
   formCheck: (body) => request('/api/analysis/form-check', { method: 'POST', body: JSON.stringify(body) }),
+  betExpandRules: () => request('/api/bet-expand/rules'),
+  betExpand: (body) => request('/api/bet-expand', { method: 'POST', body: JSON.stringify(body) }),
   predict: (body) => {
     const payload = {
       lottery_type: body.lottery_type,

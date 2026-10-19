@@ -279,6 +279,8 @@
           <div class="ph-desc">选择彩种与策略，点击「生成推荐」获取娱乐号码</div>
         </div>
 
+        <BetExpander :lottery-type="lotteryType" />
+
         <div id="form-check" class="card mb-4">
           <div class="card-title">
             一注体检
@@ -379,6 +381,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, TYPE_NAMES } from '../api'
 import NumberBalls from '../components/NumberBalls.vue'
+import BetExpander from '../components/BetExpander.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { toast } from '../composables/feedback'
 import { useBasket } from '../composables/useBasket'

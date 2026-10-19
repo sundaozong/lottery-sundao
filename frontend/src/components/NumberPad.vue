@@ -10,7 +10,7 @@
         :key="n"
         type="button"
         class="num-cell"
-        :class="[color, { on: countOf(n) > 0, locked: blocked(n) }]"
+        :class="[color, { on: countOf(n) > 0, locked: atCap(n) || held(n) }]"
         :aria-pressed="countOf(n) > 0"
         @click="pick(n)"
       >
@@ -33,6 +33,7 @@ const props = defineProps({
   max: { type: Number, default: 0 },
   maxPer: { type: Number, default: 1 },
   min: { type: Number, default: 0 },
+  exclude: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update:selected'])
 
@@ -59,7 +60,11 @@ function countOf(n) {
   return props.selected.filter((item) => item === token).length
 }
 
-function blocked(n) {
+function held(n) {
+  return props.exclude.includes(textOf(n)) && countOf(n) === 0
+}
+
+function atCap(n) {
   if (countOf(n) > 0) return false
   if (props.max > 0 && props.selected.length >= props.max) return true
   return false
@@ -67,6 +72,7 @@ function blocked(n) {
 
 function pick(n) {
   const token = textOf(n)
+  if (held(n)) return
   const count = countOf(n)
   if (props.max === 1 && props.maxPer === 1) {
     emit('update:selected', count ? [] : [token])

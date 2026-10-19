@@ -743,6 +743,25 @@ class FormCheckQuery(BaseModel):
     special: list[str]
 
 
+class BetExpandZoneIn(BaseModel):
+    numbers: Any = None
+    bankers: Any = None
+    drags: Any = None
+
+
+class BetExpandIn(BaseModel):
+    lottery_type: str
+    mode: str = "compound"
+    pick: Optional[int] = None
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=60, ge=0, le=200)
+    only_center: bool = False
+    band_limit: int = Field(default=80, ge=5, le=200)
+    main: Optional[BetExpandZoneIn] = None
+    special: Optional[BetExpandZoneIn] = None
+    positions: Optional[list[BetExpandZoneIn]] = None
+
+
 class FormCheckOut(BaseModel):
     lottery_type: str
     mode: str
