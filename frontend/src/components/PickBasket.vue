@@ -168,6 +168,24 @@
           </template>
         </section>
 
+        <section class="basket-slip" aria-label="投注单">
+          <button class="btn btn-ghost btn-sm" type="button" @click="toggleSlip">
+            {{ showSlip ? '收起投注单' : '投注单' }}
+          </button>
+          <template v-if="showSlip">
+            <p class="form-hint">把当前{{ typeName }}整理成投注站能看的单子，带序号、单价和合计。不是快照，也不对照开奖。</p>
+            <p class="basket-paste-summary">{{ slip.summary }}</p>
+            <pre v-if="!slip.empty" class="basket-slip-preview">{{ slip.text }}</pre>
+            <div class="basket-filter-actions">
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="slip.empty" @click="copySlip">复制投注单</button>
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="slip.empty" @click="downloadSlip('txt')">下载 TXT</button>
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="slip.empty" @click="downloadSlip('csv')">下载 CSV</button>
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="slip.empty" @click="printSlip">打印</button>
+            </div>
+            <p class="form-hint">{{ slipDisclaimer }}</p>
+          </template>
+        </section>
+
         <section class="basket-coverage" aria-label="覆盖度">
           <div class="card-title">覆盖度 <span class="sub">相对当前篮</span></div>
           <template v-if="coverage.ticketCount">
@@ -576,6 +594,12 @@ import { useRouter } from 'vue-router'
 import { api, TYPE_NAMES, ballClass } from '../api'
 import { basketProfile, betCount, formatBasketText, lineCost, sourceLabel, writeBasketRecords } from '../lib/basket'
 import {
+  BASKET_SLIP_DISCLAIMER,
+  buildBasketSlip,
+  slipDownload,
+  slipPrintHtml,
+} from '../lib/basketSlip'
+import {
   SNAPSHOT_DISCLAIMER,
   deleteSnapshot,
   exportSnapshotsText,
@@ -663,6 +687,9 @@ const showPrune = ref(false)
 const pruneThresholdInput = ref('')
 const pruneDisclaimer = BASKET_PRUNE_DISCLAIMER
 const showFormRank = ref(false)
+const showSlip = ref(false)
+const slipNow = ref(new Date())
+const slipDisclaimer = BASKET_SLIP_DISCLAIMER
 const rankMinInput = ref('')
 const rankOrder = ref('desc')
 const rankReports = ref({})
@@ -730,6 +757,7 @@ const focusLabel = computed(() => {
   return coverageZones.value.find((zone) => zone.key === focusCell.value.zone)?.label || ''
 })
 const typeName = computed(() => TYPE_NAMES[viewType.value] || viewType.value)
+const slip = computed(() => buildBasketSlip(visible.value, viewType.value, { now: slipNow.value }))
 const mainColor = computed(() => ballClass(viewType.value, 'main'))
 const previewCost = computed(() => visible.value.reduce(
   (sum, item) => sum + lineCost(item.lottery_type, item.numbers, multiple.value),
@@ -1219,6 +1247,66 @@ async function copyText(text, okMessage) {
   } catch {
     toast('复制失败，请检查浏览器权限', 'error')
   }
+}
+
+function currentSlip() {
+  const now = new Date()
+  slipNow.value = now
+  return buildBasketSlip(visible.value, viewType.value, { now })
+}
+
+function toggleSlip() {
+  showSlip.value = !showSlip.value
+  if (showSlip.value) slipNow.value = new Date()
+}
+
+async function copySlip() {
+  const current = currentSlip()
+  if (current.empty) {
+    toast(current.message, 'info')
+    return
+  }
+  await copyText(current.text, '已复制投注单')
+}
+
+function downloadSlip(kind) {
+  const current = currentSlip()
+  if (current.empty) {
+    toast(current.message, 'info')
+    return
+  }
+  const file = slipDownload(current, kind, slipNow.value)
+  const blob = new Blob([file.content], { type: file.mime })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = file.filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+  toast(kind === 'csv' ? '已下载 CSV 投注单' : '已下载 TXT 投注单', 'ok')
+}
+
+function printSlip() {
+  const current = currentSlip()
+  if (current.empty) {
+    toast(current.message, 'info')
+    return
+  }
+  const html = slipPrintHtml(current)
+  const win = window.open('', '_blank')
+  if (!win) {
+    toast('浏览器拦住了打印窗口，请允许弹窗后再试', 'info')
+    return
+  }
+  win.document.open()
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  window.setTimeout(() => {
+    win.print()
+  }, 150)
 }
 
 async function copyAll() {

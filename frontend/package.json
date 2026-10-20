@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test src/lib/basket.test.js src/lib/basketPaste.test.js src/lib/basketFilter.test.js src/lib/basketCoverage.test.js src/lib/basketSnapshots.test.js src/lib/basketPrune.test.js src/lib/basketFormRank.test.js src/lib/trendPick.test.js src/lib/formCheck.test.js src/lib/betExpand.test.js src/lib/replay.test.js src/lib/omitBoard.test.js src/lib/constraintPresets.test.js src/lib/basketVerify.test.js"
+    "test": "node --test src/lib/basket.test.js src/lib/basketPaste.test.js src/lib/basketFilter.test.js src/lib/basketCoverage.test.js src/lib/basketSnapshots.test.js src/lib/basketPrune.test.js src/lib/basketFormRank.test.js src/lib/basketSlip.test.js src/lib/trendPick.test.js src/lib/formCheck.test.js src/lib/betExpand.test.js src/lib/replay.test.js src/lib/omitBoard.test.js src/lib/constraintPresets.test.js src/lib/basketVerify.test.js"
   },
   "dependencies": {
     "vue": "^3.5.13",
