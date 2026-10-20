@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas import AcIn, ClusterIn, CollisionIn, DaxiaoIn, DaxiaoOut, DaxiaoScoreOut, EchoIn, FormCheckIn, FormCheckOut, HeweiIn, JunzhiIn, JunzhiOut, JunzhiScoreOut, MomentumIn, NeighborIn, OmitBoardOut, ParityIn, PrimeIn, RepeatIn, RoadIn, ShengpingIn, ShengpingOut, ShengpingScoreOut, SpanIn, SumIn, TailIn, ZhenfuIn, ZhenfuOut, ZhenfuScoreOut, ZhongweiIn, ZhongweiOut, ZhongweiScoreOut, ZoneIn
+from ..schemas import AcIn, ClusterIn, CollisionIn, DaxiaoIn, DaxiaoOut, DaxiaoScoreOut, EchoIn, FormCheckBatchIn, FormCheckBatchOut, FormCheckIn, FormCheckOut, HeweiIn, JunzhiIn, JunzhiOut, JunzhiScoreOut, MomentumIn, NeighborIn, OmitBoardOut, ParityIn, PrimeIn, RepeatIn, RoadIn, ShengpingIn, ShengpingOut, ShengpingScoreOut, SpanIn, SumIn, TailIn, ZhenfuIn, ZhenfuOut, ZhenfuScoreOut, ZhongweiIn, ZhongweiOut, ZhongweiScoreOut, ZoneIn
 from ..services.affinity import affinity_stats
 from ..services.analyze import analyze
 from ..services.collision import collide, collide_records
@@ -25,7 +25,7 @@ from ..services.tail import score_tail, tail_summary
 from ..services.zone import score_zone, zone_summary
 from ..services.sum_pulse import score_sum, sum_summary
 from ..services.shape import shape_stats
-from ..services.form_check import check_form
+from ..services.form_check import check_form, check_form_batch
 from ..services.omit_board import omit_board
 from ..services.seed import ensure_seed
 from ..lotteries import normalize_type
@@ -789,6 +789,16 @@ def post_form_check(body: FormCheckIn, db: Session = Depends(get_db)):
     lottery, main, special = _form_ticket(body)
     try:
         return check_form(db, lottery, main, special, limit=body.limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/form-check/batch", response_model=FormCheckBatchOut)
+def post_form_check_batch(body: FormCheckBatchIn, db: Session = Depends(get_db)):
+    ensure_seed(db)
+    lottery = (body.lottery_type or body.type or "").strip()
+    try:
+        return check_form_batch(db, lottery, [ticket.model_dump() for ticket in body.tickets], limit=body.limit)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

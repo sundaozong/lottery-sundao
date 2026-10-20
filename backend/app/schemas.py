@@ -833,3 +833,35 @@ class FormCheckOut(BaseModel):
     data_status: str
     disclaimer: str
     number_scope: str
+
+
+class FormCheckBatchTicketIn(BaseModel):
+    id: str = ""
+    main: Any = None
+    numbers: Any = None
+    special: Any = None
+
+
+class FormCheckBatchIn(BaseModel):
+    lottery_type: str = ""
+    type: str = ""
+    limit: int = Field(default=80, ge=5, le=200)
+    tickets: list[FormCheckBatchTicketIn] = Field(default_factory=list, max_length=200)
+
+
+class FormCheckBatchItem(BaseModel):
+    id: str = ""
+    index: int
+    ok: bool
+    error: str = ""
+    report: Optional[FormCheckOut] = None
+
+
+class FormCheckBatchOut(BaseModel):
+    lottery_type: str
+    limit: int
+    sample_size: int
+    band: str
+    data_status: str
+    disclaimer: str
+    items: list[FormCheckBatchItem]

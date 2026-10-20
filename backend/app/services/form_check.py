@@ -332,15 +332,7 @@ def center_bands(db: Session, lottery_type: str, limit: int = 80) -> dict:
     }
 
 
-def check_form(db: Session, lottery_type: str, main, special=None, limit: int = 80) -> dict:
-    """给一注做形态体检。main / special 的个数和范围跟回声、脉动打分同一套规则。"""
-    query = normalize_query(lottery_type, main, special)
-    lottery = query["lottery_type"]
-    profile = PROFILES[lottery]
-    limit_n = _limit_of(limit)
-    draws, status = _load(db, lottery, profile, limit_n)
-    main_history = _collect(draws, profile, "main", special=False)
-    special_history = _collect(draws, profile, "special", special=True)
+def _assemble(query: dict, profile: dict, draws: list, status: str, limit_n: int, main_history: dict, special_history: dict) -> dict:
     metrics = _rows(_present(query["main"], profile, special=False), main_history, require_all=True)
     special_metrics = []
     if query["special"]:
@@ -350,7 +342,7 @@ def check_form(db: Session, lottery_type: str, main, special=None, limit: int = 
             require_all=False,
         )
     return {
-        "lottery_type": lottery,
+        "lottery_type": query["lottery_type"],
         "mode": profile["mode"],
         "sample_size": len(draws),
         "limit": limit_n,
@@ -363,4 +355,79 @@ def check_form(db: Session, lottery_type: str, main, special=None, limit: int = 
         "data_status": status,
         "disclaimer": DISCLAIMER,
         "number_scope": "主号",
+    }
+
+
+def _prepare(db: Session, lottery: str, profile: dict, limit: int):
+    limit_n = _limit_of(limit)
+    draws, status = _load(db, lottery, profile, limit_n)
+    return (
+        limit_n,
+        draws,
+        status,
+        _collect(draws, profile, "main", special=False),
+        _collect(draws, profile, "special", special=True),
+    )
+
+
+def check_form(db: Session, lottery_type: str, main, special=None, limit: int = 80) -> dict:
+    """给一注做形态体检。main / special 的个数和范围跟回声、脉动打分同一套规则。"""
+    query = normalize_query(lottery_type, main, special)
+    lottery = query["lottery_type"]
+    profile = PROFILES[lottery]
+    limit_n, draws, status, main_history, special_history = _prepare(db, lottery, profile, limit)
+    return _assemble(query, profile, draws, status, limit_n, main_history, special_history)
+
+
+BATCH_LIMIT = 200
+
+
+def _ticket_fields(ticket) -> tuple[str, object, object]:
+    if not isinstance(ticket, dict):
+        raise ValueError("注的格式不对")
+    ticket_id = str(ticket.get("id") or "")
+    main = ticket.get("main")
+    special = ticket.get("special")
+    numbers = ticket.get("numbers")
+    if main is None and numbers is not None:
+        if isinstance(numbers, dict):
+            main = numbers.get("main", numbers.get("red", numbers.get("front")))
+            if special is None:
+                special = numbers.get("special", numbers.get("blue", numbers.get("back")))
+        else:
+            main = numbers
+    return ticket_id, main, special
+
+
+def check_form_batch(db: Session, lottery_type: str, tickets, limit: int = 80) -> dict:
+    """同一彩种多注一次对照历史分位。每注结果与 check_form 相同，失败的注单独标出。"""
+    lottery = normalize_type(lottery_type)
+    if lottery not in PROFILES:
+        raise ValueError("未知彩种")
+    if tickets is None:
+        tickets = []
+    if not isinstance(tickets, list):
+        raise ValueError("请给出要打分的注")
+    if len(tickets) > BATCH_LIMIT:
+        raise ValueError(f"一次最多打分 {BATCH_LIMIT} 注")
+    profile = PROFILES[lottery]
+    limit_n, draws, status, main_history, special_history = _prepare(db, lottery, profile, limit)
+    items = []
+    for index, ticket in enumerate(tickets):
+        ticket_id = str(ticket.get("id") or "") if isinstance(ticket, dict) else ""
+        try:
+            ticket_id, main, special = _ticket_fields(ticket)
+            query = normalize_query(lottery, main, special)
+            report = _assemble(query, profile, draws, status, limit_n, main_history, special_history)
+            items.append({"id": ticket_id, "index": index, "ok": True, "error": "", "report": report})
+        except ValueError as exc:
+            items.append({"id": ticket_id, "index": index, "ok": False, "error": str(exc), "report": None})
+    return {
+        "lottery_type": lottery,
+        "limit": limit_n,
+        "sample_size": len(draws),
+        "band": "p25-p75",
+        "data_status": status,
+        "disclaimer": DISCLAIMER,
+        "items": items,
     }
