@@ -102,6 +102,72 @@
           </template>
         </section>
 
+        <section class="basket-form-rank" aria-label="形态打分">
+          <button class="btn btn-ghost btn-sm" type="button" @click="toggleFormRank">
+            {{ showFormRank ? '收起形态打分' : '形态打分' }}
+          </button>
+          <template v-if="showFormRank">
+            <p class="form-hint">对照一注体检的常见带，给当前彩种每注打居中分。特别号只作备注。排序只在这张表里，篮里的先后不动。</p>
+            <div class="basket-form-rank-bar">
+              <label class="form-label" for="basket-form-rank-min">最低居中项</label>
+              <input
+                id="basket-form-rank-min"
+                v-model="rankMinInput"
+                class="form-input"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                :max="rankMetricMax"
+                placeholder="一半"
+                @input="rankSelection = 'auto'"
+              />
+              <button class="btn btn-ghost btn-sm" type="button" @click="toggleRankOrder">
+                {{ rankOrder === 'desc' ? '分数从高到低' : '分数从低到高' }}
+              </button>
+              <button class="btn btn-ghost btn-sm" type="button" :disabled="ranking || !count" @click="runFormRank">
+                {{ ranking ? '打分中…' : '重新打分' }}
+              </button>
+            </div>
+            <p v-if="rankModel.threshold.ok === false" class="basket-verify-error">{{ rankModel.threshold.message }}</p>
+            <p class="basket-paste-summary">{{ rankModel.summary.text }}</p>
+            <p v-if="rankError" class="basket-verify-error">{{ rankError }}</p>
+            <ul v-if="rankModel.rows.length" class="basket-form-rank-list">
+              <li
+                v-for="row in rankModel.rows"
+                :key="row.id"
+                class="basket-form-rank-row"
+                :class="{ 'is-skew': row.skewed }"
+              >
+                <div class="basket-form-rank-top">
+                  <input
+                    :id="`basket-form-rank-${row.id}`"
+                    type="checkbox"
+                    :checked="rankCheckedIds.includes(row.id)"
+                    :disabled="!row.scored.ok || row.scored.sampleShort"
+                    @change="toggleRankCheck(row.id, $event)"
+                  />
+                  <label class="sr-only" :for="`basket-form-rank-${row.id}`">勾选移出 {{ row.label }}</label>
+                  <span class="badge" :class="row.badge.tone">{{ row.badge.text }}</span>
+                  <span v-if="row.counts" class="basket-form-rank-counts">{{ row.counts }}</span>
+                </div>
+                <NumberBalls :numbers="row.numbers" :type="viewType" size="sm" />
+                <p v-if="row.scored.glance" class="form-hint">{{ row.scored.glance }}</p>
+                <p v-if="row.scored.specialNote" class="form-hint">{{ row.scored.specialNote }}</p>
+                <p v-if="row.scored.error" class="basket-verify-error">{{ row.scored.error }}</p>
+              </li>
+            </ul>
+            <div class="basket-filter-actions">
+              <button
+                class="btn btn-primary btn-sm"
+                type="button"
+                :disabled="ranking || !rankRemovalIds.length"
+                @click="removeRanked"
+              >移出勾选</button>
+            </div>
+            <p class="form-hint">{{ formRankDisclaimer }}</p>
+          </template>
+        </section>
+
         <section class="basket-coverage" aria-label="覆盖度">
           <div class="card-title">覆盖度 <span class="sub">相对当前篮</span></div>
           <template v-if="coverage.ticketCount">
@@ -539,6 +605,15 @@ import {
   previewBasketFilter,
 } from '../lib/basketFilter'
 import {
+  BASKET_FORM_RANK_DISCLAIMER,
+  FORM_RANK_LIMIT,
+  FORM_RANK_METRIC_MAX,
+  buildFormRank,
+  formRankRemovalIds,
+  formRankRemovalPreview,
+  scoreBasketTickets,
+} from '../lib/basketFormRank'
+import {
   betHitView,
   formatMoney,
   formatSignedMoney,
@@ -587,6 +662,16 @@ const showFilter = ref(false)
 const showPrune = ref(false)
 const pruneThresholdInput = ref('')
 const pruneDisclaimer = BASKET_PRUNE_DISCLAIMER
+const showFormRank = ref(false)
+const rankMinInput = ref('')
+const rankOrder = ref('desc')
+const rankReports = ref({})
+const rankError = ref('')
+const ranking = ref(false)
+const rankSelection = ref('auto')
+const rankMetricMax = FORM_RANK_METRIC_MAX
+const formRankDisclaimer = BASKET_FORM_RANK_DISCLAIMER
+let rankSeq = 0
 const showSnapshots = ref(false)
 const snapshotList = ref([])
 const snapshotName = ref('')
@@ -659,6 +744,14 @@ const pruneStrict = computed(() => profile.value?.mainCount || 0)
 const prunePreview = computed(() => previewBasketPrune(visible.value, viewType.value, pruneThresholdInput.value))
 const pruneDrops = computed(() => prunePreview.value.remove.slice(0, 8))
 const pruneRemoveIds = computed(() => new Set(prunePreview.value.removeIds))
+const rankModel = computed(() => buildFormRank(visible.value, viewType.value, rankReports.value, {
+  order: rankOrder.value,
+  minCentered: rankMinInput.value,
+}))
+const rankCheckedIds = computed(() => (
+  rankSelection.value === 'auto' ? rankModel.value.skewedIds : rankSelection.value
+))
+const rankRemovalIds = computed(() => formRankRemovalIds(visible.value, viewType.value, rankCheckedIds.value))
 const pasteActive = computed(() => pastePreview.value.drafts.length > 0 || pastePreview.value.invalidCount > 0)
 const verifyMultiple = computed(() => Math.max(1, Math.floor(Number(multiple.value) || 1)))
 const pastePlaceholder = computed(() => {
@@ -1026,6 +1119,78 @@ async function applyPrune() {
   toast(`已移出 ${removed} 注，留下 ${kept} 注`, 'ok')
 }
 
+function toggleRankOrder() {
+  rankOrder.value = rankOrder.value === 'desc' ? 'asc' : 'desc'
+}
+
+function toggleRankCheck(id, event) {
+  const next = new Set(rankCheckedIds.value)
+  if (event.target.checked) next.add(id)
+  else next.delete(id)
+  rankSelection.value = [...next]
+}
+
+async function toggleFormRank() {
+  showFormRank.value = !showFormRank.value
+  if (showFormRank.value) {
+    await runFormRank()
+    return
+  }
+  rankError.value = ''
+}
+
+async function runFormRank() {
+  const lottery = viewType.value
+  const rows = visible.value.filter((item) => item.lottery_type === lottery)
+  if (!rows.length) {
+    rankSeq += 1
+    rankReports.value = {}
+    rankError.value = ''
+    ranking.value = false
+    return
+  }
+  const seq = ++rankSeq
+  ranking.value = true
+  rankError.value = ''
+  try {
+    const tickets = rows.map((item) => ({
+      id: item.id,
+      main: item.numbers?.main || [],
+      special: item.numbers?.special || [],
+    }))
+    const reports = await scoreBasketTickets(tickets, (payload) => api.formCheckBatch({
+      lottery_type: lottery,
+      limit: payload.limit,
+      tickets: payload.tickets,
+    }), { limit: FORM_RANK_LIMIT })
+    if (seq !== rankSeq || lottery !== viewType.value) return
+    rankReports.value = reports
+    rankSelection.value = 'auto'
+  } catch (err) {
+    if (seq !== rankSeq || lottery !== viewType.value) return
+    rankError.value = err?.message || '打分失败'
+  } finally {
+    if (seq === rankSeq) ranking.value = false
+  }
+}
+
+async function removeRanked() {
+  const ids = formRankRemovalIds(visible.value, viewType.value, rankCheckedIds.value)
+  if (!ids.length) {
+    toast('没有勾选要移出的注', 'info')
+    return
+  }
+  const preview = formRankRemovalPreview(rankModel.value.rows, ids)
+  const ok = await confirmDialog({
+    title: '移出偏态注',
+    message: `从当前${typeName.value}${preview.text.replace('将移出', '移出')}。其他彩种不动。`,
+    confirmText: '移出',
+  })
+  if (!ok) return
+  dropIds(ids)
+  toast(`已移出 ${preview.count} 注`, 'ok')
+}
+
 function resetCoverageView() {
   focusCell.value = null
   markHot.value = false
@@ -1168,8 +1333,15 @@ watch(viewType, () => {
   snapshotConflict.value = false
   renamingId.value = ''
   renameText.value = ''
+  rankMinInput.value = ''
+  rankOrder.value = 'desc'
+  rankSelection.value = 'auto'
+  rankError.value = ''
+  rankReports.value = {}
+  rankSeq += 1
   reloadSnapshots()
   if (showVerify.value) loadVerifyIssues()
+  if (showFormRank.value) runFormRank()
 })
 
 watch(() => visible.value.map((item) => item.id).join('|'), () => {
@@ -1177,6 +1349,12 @@ watch(() => visible.value.map((item) => item.id).join('|'), () => {
   verifyResult.value = null
   verifyError.value = ''
   verifying.value = false
+  rankSelection.value = 'auto'
+  if (!showFormRank.value) {
+    rankReports.value = {}
+    return
+  }
+  runFormRank()
 })
 
 watch(isOpen, (open) => {

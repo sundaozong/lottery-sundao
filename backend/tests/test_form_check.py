@@ -402,3 +402,95 @@ def test_api_rejects_bad_input(client):
     assert empty.status_code == 200
     assert empty.json()["sample_size"] == 0
     assert empty.json()["glance"] == "还没有历史可对照"
+
+
+def test_batch_matches_single_and_isolates_bad_tickets(db):
+    from app.services.form_check import check_form, check_form_batch
+
+    _draw(db, "ssq", "2026002", ["01", "02", "03", "04", "05", "06"], ["08"])
+    _draw(db, "ssq", "2026001", ["02", "03", "04", "05", "06", "16"], ["09"])
+    good_main = ["01", "02", "03", "04", "05", "33"]
+    other_main = ["02", "03", "04", "05", "06", "16"]
+    batch = check_form_batch(
+        db,
+        "ssq",
+        [
+            {"id": "good", "main": good_main, "special": ["16"]},
+            {"id": "bad", "main": ["01", "01", "03", "04", "05", "06"], "special": ["16"]},
+            {"id": "other", "numbers": {"main": other_main, "special": ["07"]}},
+        ],
+        limit=40,
+    )
+    assert batch["lottery_type"] == "ssq"
+    assert batch["limit"] == 40
+    assert batch["sample_size"] == 2
+    assert "pulse" not in batch
+    assert "short" not in batch
+    assert "long" not in batch
+    assert [item["id"] for item in batch["items"]] == ["good", "bad", "other"]
+    good = check_form(db, "ssq", good_main, ["16"], limit=40)
+    other = check_form(db, "ssq", other_main, ["07"], limit=40)
+    assert batch["items"][0]["ok"] is True
+    assert batch["items"][0]["report"] == good
+    assert batch["items"][1]["ok"] is False
+    assert batch["items"][1]["report"] is None
+    assert "重复" in batch["items"][1]["error"]
+    assert batch["items"][2]["ok"] is True
+    assert batch["items"][2]["report"] == other
+    assert good["summary"] != other["summary"] or good["query"] != other["query"]
+    assert good["glance"] == batch["items"][0]["report"]["glance"]
+    assert "特别" not in str(good["summary"])
+
+
+def test_batch_unknown_lottery_does_not_query():
+    from app.services.form_check import check_form_batch
+
+    class Empty:
+        def query(self, *_args, **_kwargs):
+            raise AssertionError("未知彩种不应查库")
+
+    with pytest.raises(ValueError, match="未知彩种"):
+        check_form_batch(Empty(), "nope", [{"id": "a", "main": ["01", "02", "03", "04", "05", "06"], "special": ["01"]}])
+
+
+def test_api_batch_matches_single_and_keeps_span_pulse(client, db):
+    _draw(db, "ssq", "2026002", ["01", "02", "03", "04", "05", "06"], ["08"], source="crawl")
+    _draw(db, "ssq", "2026001", ["02", "03", "04", "05", "06", "16"], ["09"])
+    before = client.get("/api/analysis/ssq/span")
+    assert before.status_code == 200
+
+    single = client.post(
+        "/api/analysis/form-check",
+        json={"lottery_type": "ssq", "main": ["01", "02", "03", "04", "05", "06"], "special": ["07"], "limit": 80},
+    )
+    assert single.status_code == 200
+    batched = client.post(
+        "/api/analysis/form-check/batch",
+        json={
+            "lottery_type": "ssq",
+            "limit": 80,
+            "tickets": [
+                {"id": "a", "main": ["01", "02", "03", "04", "05", "06"], "special": ["07"]},
+                {"id": "b", "main": ["01", "01", "03", "04", "05", "06"]},
+            ],
+        },
+    )
+    assert batched.status_code == 200
+    body = batched.json()
+    assert body["items"][0]["ok"] is True
+    assert body["items"][0]["report"]["metrics"] == single.json()["metrics"]
+    assert body["items"][0]["report"]["summary"] == single.json()["summary"]
+    assert body["items"][0]["report"]["glance"] == single.json()["glance"]
+    assert body["items"][0]["report"]["special_metrics"] == single.json()["special_metrics"]
+    assert body["items"][1]["ok"] is False
+    assert body["items"][1]["report"] is None
+    assert "pulse" not in body
+    assert "short" not in body
+    assert "long" not in body
+
+    after = client.get("/api/analysis/ssq/span")
+    assert after.json()["pulse"] == before.json()["pulse"]
+    assert after.json()["drift"] == before.json()["drift"]
+
+    unknown = client.post("/api/analysis/form-check/batch", json={"lottery_type": "nope", "tickets": []})
+    assert unknown.status_code == 400

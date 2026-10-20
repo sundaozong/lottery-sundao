@@ -1384,6 +1384,53 @@ button.ball {
   border-bottom: 1px solid var(--border);
 }
 .basket-prune > .btn { margin-bottom: 10px; }
+.basket-form-rank {
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.basket-form-rank > .btn { margin-bottom: 10px; }
+.basket-form-rank-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.basket-form-rank-bar .form-label { margin: 0; }
+.basket-form-rank-bar .form-input {
+  width: 4.75rem;
+  padding: 7px 8px;
+}
+.basket-form-rank-bar .btn { margin-bottom: 0; }
+.basket-form-rank-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.basket-form-rank-row {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+.basket-form-rank-row.is-skew { border-color: #8ea4bb; }
+.basket-form-rank-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.basket-form-rank-counts {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.basket-form-rank-row .form-hint,
+.basket-form-rank-row .basket-verify-error { margin: 6px 0 0; }
 .basket-prune-threshold {
   display: flex;
   flex-wrap: wrap;
